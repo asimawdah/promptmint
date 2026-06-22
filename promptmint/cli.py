@@ -13,7 +13,7 @@ from .tokens import estimate_tokens
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="promptpack",
+        prog="promptmint",
         description="Turn any codebase into an AI-ready Markdown prompt pack.",
     )
     parser.add_argument("path", nargs="?", default=".", help="Project directory to scan")
@@ -22,7 +22,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--error", dest="error_file", help="Path to an error log to include")
     parser.add_argument("--include", action="append", default=[], help="Glob to include; can be repeated")
     parser.add_argument("--exclude", action="append", default=[], help="Glob to exclude; can be repeated")
-    parser.add_argument("--output", default="promptpack-output.md", help="Output Markdown file")
+    parser.add_argument("--output", default="promptmint-output.md", help="Output Markdown file")
     parser.add_argument("--copy", action="store_true", help="Copy output to clipboard if a clipboard tool is available")
     parser.add_argument("--max-file-bytes", type=int, default=50_000, help="Skip files larger than this size")
     return parser

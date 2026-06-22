@@ -1,37 +1,43 @@
-# PromptPack
+# PromptMint
 
 Turn any codebase into an AI-ready prompt.
 
-PromptPack scans your project, collects useful source files, dependency manifests, git diff, and optional error logs, then generates a clean Markdown context pack you can paste into ChatGPT, Claude, Gemini, or any coding agent.
+PromptMint scans your project, collects useful source files, dependency manifests, git diff, and optional error logs, then generates a clean Markdown context pack you can paste into ChatGPT, Claude, Gemini, or any coding agent.
 
 ## Why?
 
-Copying files into AI chats is slow and messy. PromptPack gives you one command that creates a structured, safe context file for debugging, code review, refactoring, and project explanation.
+Copying files into AI chats is slow and messy. PromptMint gives you one command that creates a structured, safe context file for debugging, code review, refactoring, and project explanation.
 
-## Install locally
+## Install
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/promptpack.git
-cd promptpack
+pip install promptmint
+```
+
+## Install locally for development
+
+```bash
+git clone https://github.com/YOUR_USERNAME/promptmint.git
+cd promptmint
 python3 -m pip install -e .
 ```
 
 ## Usage
 
 ```bash
-promptpack --goal "Fix this bug" --mode debug
+promptmint --goal "Fix this bug" --mode debug
 ```
 
 ```bash
-promptpack --goal "Review this PR" --mode review --output review-context.md
+promptmint --goal "Review this PR" --mode review --output review-context.md
 ```
 
 ```bash
-promptpack --goal "Explain this project" --mode explain
+promptmint --goal "Explain this project" --mode explain
 ```
 
 ```bash
-promptpack --error error.log --mode debug --copy
+promptmint --error error.log --mode debug --copy
 ```
 
 ## Modes
@@ -60,11 +66,11 @@ promptpack --error error.log --mode debug --copy
 ## Examples
 
 ```bash
-promptpack . --include "src/**/*.py" --goal "Find the bug"
+promptmint . --include "src/**/*.py" --goal "Find the bug"
 ```
 
 ```bash
-promptpack . --exclude "tests/fixtures/**" --max-file-bytes 20000
+promptmint . --exclude "tests/fixtures/**" --max-file-bytes 20000
 ```
 
 ## Development

@@ -2,7 +2,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from promptpack.scanner import scan_project
+from promptmint.scanner import scan_project
 
 
 class ScanProjectTest(unittest.TestCase):

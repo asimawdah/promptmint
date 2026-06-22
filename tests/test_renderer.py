@@ -1,7 +1,7 @@
 import unittest
 
-from promptpack.models import ProjectFile, ScanResult
-from promptpack.renderer import render_context_pack
+from promptmint.models import ProjectFile, ScanResult
+from promptmint.renderer import render_context_pack
 
 
 class RenderContextPackTest(unittest.TestCase):

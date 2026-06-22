@@ -32,7 +32,7 @@ DEFAULT_EXCLUDED_FILES = {
     ".env.local",
     ".env.production",
     ".DS_Store",
-    "promptpack-output.md",
+    "promptmint-output.md",
 }
 
 DEPENDENCY_FILES = {

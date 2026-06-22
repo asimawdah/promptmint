@@ -2,7 +2,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from promptpack.cli import main
+from promptmint.cli import main
 
 
 class CliTest(unittest.TestCase):

@@ -3,7 +3,7 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "promptpack-ai"
+name = "promptmint"
 version = "0.1.0"
 description = "Turn any codebase into an AI-ready prompt context pack."
 readme = "README.md"
@@ -22,8 +22,8 @@ classifiers = [
 ]
 
 [project.scripts]
-promptpack = "promptpack.cli:main"
+promptmint = "promptmint.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["promptpack*"]
+include = ["promptmint*"]

@@ -1,6 +1,6 @@
 import unittest
 
-from promptpack.tokens import estimate_tokens
+from promptmint.tokens import estimate_tokens
 
 
 class EstimateTokensTest(unittest.TestCase):
