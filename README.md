@@ -25,7 +25,7 @@ python3 -m pip install -e .
 ## Usage
 
 ```bash
-promptmint --goal "Fix this bug" --mode debug
+promptmint -g "Fix this bug" -m debug
 ```
 
 ```bash
@@ -37,8 +37,19 @@ promptmint --goal "Explain this project" --mode explain
 ```
 
 ```bash
-promptmint --error error.log --mode debug --copy
+promptmint -e error.log -m debug -c
 ```
+
+## CLI Shortcuts
+
+- `-g`, `--goal`: task goal
+- `-m`, `--mode`: prompt mode
+- `-e`, `--error`: error log file
+- `-i`, `--include`: include glob, repeatable
+- `-x`, `--exclude`: exclude glob, repeatable
+- `-o`, `--output`: output Markdown file
+- `-c`, `--copy`: copy output to clipboard
+- `-s`, `--max-file-bytes`: skip files larger than this size
 
 ## Modes
 

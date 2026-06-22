@@ -17,14 +17,14 @@ def build_parser() -> argparse.ArgumentParser:
         description="Turn any codebase into an AI-ready Markdown prompt pack.",
     )
     parser.add_argument("path", nargs="?", default=".", help="Project directory to scan")
-    parser.add_argument("--goal", default=None, help="Task goal to include in the prompt")
-    parser.add_argument("--mode", choices=sorted(MODE_REQUESTS), default="debug", help="Prompt mode")
-    parser.add_argument("--error", dest="error_file", help="Path to an error log to include")
-    parser.add_argument("--include", action="append", default=[], help="Glob to include; can be repeated")
-    parser.add_argument("--exclude", action="append", default=[], help="Glob to exclude; can be repeated")
-    parser.add_argument("--output", default="promptmint-output.md", help="Output Markdown file")
-    parser.add_argument("--copy", action="store_true", help="Copy output to clipboard if a clipboard tool is available")
-    parser.add_argument("--max-file-bytes", type=int, default=50_000, help="Skip files larger than this size")
+    parser.add_argument("-g", "--goal", default=None, help="Task goal to include in the prompt")
+    parser.add_argument("-m", "--mode", choices=sorted(MODE_REQUESTS), default="debug", help="Prompt mode")
+    parser.add_argument("-e", "--error", dest="error_file", help="Path to an error log to include")
+    parser.add_argument("-i", "--include", action="append", default=[], help="Glob to include; can be repeated")
+    parser.add_argument("-x", "--exclude", action="append", default=[], help="Glob to exclude; can be repeated")
+    parser.add_argument("-o", "--output", default="promptmint-output.md", help="Output Markdown file")
+    parser.add_argument("-c", "--copy", action="store_true", help="Copy output to clipboard if a clipboard tool is available")
+    parser.add_argument("-s", "--max-file-bytes", type=int, default=50_000, help="Skip files larger than this size")
     return parser
 
 
