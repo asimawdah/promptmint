@@ -46,6 +46,36 @@ class CliTest(unittest.TestCase):
             self.assertIn("app.py", text)
             self.assertNotIn("notes.md", text)
 
+    def test_cli_rejects_missing_project_path(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            missing = Path(tmp) / "missing"
+
+            with self.assertRaises(SystemExit) as context:
+                main([str(missing)])
+
+            self.assertNotEqual(context.exception.code, 0)
+
+    def test_cli_rejects_missing_error_log(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "app.py").write_text("print('hello')\n", encoding="utf-8")
+            missing_error = root / "missing.log"
+
+            with self.assertRaises(SystemExit) as context:
+                main([str(root), "--error", str(missing_error)])
+
+            self.assertNotEqual(context.exception.code, 0)
+
+    def test_cli_rejects_non_positive_max_file_bytes(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "app.py").write_text("print('hello')\n", encoding="utf-8")
+
+            with self.assertRaises(SystemExit) as context:
+                main([str(root), "--max-file-bytes", "0"])
+
+            self.assertNotEqual(context.exception.code, 0)
+
 
 if __name__ == "__main__":
     unittest.main()
