@@ -41,6 +41,27 @@ class ScanProjectTest(unittest.TestCase):
 
             self.assertEqual(paths, ["docs/guide.md"])
 
+    def test_scan_project_respects_root_gitignore_patterns(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "src").mkdir()
+            (root / "tmp").mkdir()
+            (root / ".gitignore").write_text("*.log\ntmp/\nsecret.txt\n", encoding="utf-8")
+            (root / "src" / "app.py").write_text("print('hello')\n", encoding="utf-8")
+            (root / "src" / "debug.log").write_text("debug\n", encoding="utf-8")
+            (root / "tmp" / "cache.txt").write_text("cache\n", encoding="utf-8")
+            (root / "secret.txt").write_text("secret\n", encoding="utf-8")
+
+            result = scan_project(root)
+            paths = [f.relative_path for f in result.files]
+
+            self.assertIn("src/app.py", paths)
+            self.assertIn(".gitignore", paths)
+            self.assertNotIn("src/debug.log", paths)
+            self.assertNotIn("tmp/cache.txt", paths)
+            self.assertNotIn("secret.txt", paths)
+            self.assertNotIn("tmp/", result.tree)
+
 
 if __name__ == "__main__":
     unittest.main()
