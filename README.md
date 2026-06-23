@@ -73,6 +73,20 @@ promptmint -e error.log -m debug -c
 - `.env` files
 - Binary files
 - Large files over 50KB by default
+- Files and directories ignored by root `.gitignore` patterns
+
+## `.gitignore` support
+
+PromptMint reads the root `.gitignore` file and skips matching files before it builds the context pack. This keeps generated prompts smaller and avoids sending common local files such as logs, build outputs, caches, and ignored secrets.
+
+Supported pattern types include:
+
+- file globs like `*.log`
+- directory ignores like `tmp/`
+- exact root-relative files like `secret.txt`
+- path patterns supported by Python glob matching
+
+Negated patterns such as `!keep.log` are currently ignored and may be added later.
 
 ## Examples
 
@@ -97,7 +111,7 @@ python3 -m unittest discover -s tests -v
 - [x] Dependency manifest detection
 - [x] Git diff inclusion
 - [x] Debug/review/explain/refactor modes
-- [ ] Better `.gitignore` support
+- [x] Better `.gitignore` support
 - [ ] Token budget smart trimming
 - [ ] Interactive file picker
 - [ ] JSON output
