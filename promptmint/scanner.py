@@ -108,6 +108,7 @@ def scan_project(
     root_path = Path(root).resolve()
     exclude_patterns = exclude or []
     include_patterns = include or []
+    gitignore_patterns = _load_gitignore_patterns(root_path)
 
     files: list[ProjectFile] = []
     dependency_files: list[ProjectFile] = []
@@ -115,7 +116,7 @@ def scan_project(
 
     for path in sorted(root_path.rglob("*")):
         rel = path.relative_to(root_path).as_posix()
-        if _is_excluded(path, rel, root_path, exclude_patterns):
+        if _is_excluded(path, rel, root_path, exclude_patterns, gitignore_patterns):
             continue
         if path.is_dir():
             tree_paths.append(rel + "/")
@@ -146,13 +147,57 @@ def scan_project(
     )
 
 
-def _is_excluded(path: Path, rel: str, root: Path, extra_patterns: list[str]) -> bool:
+def _is_excluded(
+    path: Path,
+    rel: str,
+    root: Path,
+    extra_patterns: list[str],
+    gitignore_patterns: list[str],
+) -> bool:
     parts = set(path.relative_to(root).parts)
     if parts & DEFAULT_EXCLUDED_DIRS:
         return True
     if path.name in DEFAULT_EXCLUDED_FILES:
         return True
-    return _matches_any(rel, extra_patterns)
+    return _matches_any(rel, extra_patterns) or _matches_gitignore(rel, path.is_dir(), gitignore_patterns)
+
+
+def _load_gitignore_patterns(root: Path) -> list[str]:
+    gitignore = root / ".gitignore"
+    if not gitignore.exists() or not gitignore.is_file():
+        return []
+
+    patterns: list[str] = []
+    for line in gitignore.read_text(encoding="utf-8", errors="replace").splitlines():
+        pattern = line.strip()
+        if not pattern or pattern.startswith("#") or pattern.startswith("!"):
+            continue
+        patterns.append(pattern)
+    return patterns
+
+
+def _matches_gitignore(rel: str, is_dir: bool, patterns: list[str]) -> bool:
+    for pattern in patterns:
+        normalized = pattern.lstrip("/")
+        if pattern.endswith("/"):
+            directory = normalized.rstrip("/")
+            if rel == directory or rel.startswith(f"{directory}/"):
+                return True
+            if _path_contains_directory(rel, directory):
+                return True
+            continue
+
+        if _matches_any(rel, [normalized]):
+            return True
+        if "/" not in normalized and fnmatch.fnmatch(Path(rel).name, normalized):
+            return True
+        if is_dir and rel == normalized:
+            return True
+    return False
+
+
+def _path_contains_directory(rel: str, directory: str) -> bool:
+    return directory in Path(rel).parts
 
 
 def _matches_any(rel: str, patterns: list[str]) -> bool:
