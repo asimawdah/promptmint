@@ -17,7 +17,7 @@ pip install promptmint
 ## Install locally for development
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/promptmint.git
+git clone https://github.com/asimawdah/promptmint.git
 cd promptmint
 python3 -m pip install -e .
 ```
@@ -73,6 +73,27 @@ promptmint -e error.log -m debug -c
 - `.env` files
 - Binary files
 - Large files over 50KB by default
+
+## Safety notes
+
+PromptMint is designed to avoid common noisy or sensitive paths, but you should still review the generated Markdown before pasting it into an AI tool.
+
+Recommended safe workflow:
+
+1. Run PromptMint with a narrow include pattern first.
+2. Open the generated Markdown and check for secrets, tokens, private URLs, or customer data.
+3. Add extra `--exclude` patterns for anything that should never leave your machine.
+4. Commit a project-level `.gitignore` and keep secrets in ignored `.env` files.
+
+Example:
+
+```bash
+promptmint . \
+  --include "src/**/*.py" \
+  --exclude "**/secrets/**" \
+  --exclude "**/*.pem" \
+  --goal "Review this module safely"
+```
 
 ## Examples
 

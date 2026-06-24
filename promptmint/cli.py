@@ -24,16 +24,27 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("-x", "--exclude", action="append", default=[], help="Glob to exclude; can be repeated")
     parser.add_argument("-o", "--output", default="promptmint-output.md", help="Output Markdown file")
     parser.add_argument("-c", "--copy", action="store_true", help="Copy output to clipboard if a clipboard tool is available")
-    parser.add_argument("-s", "--max-file-bytes", type=int, default=50_000, help="Skip files larger than this size")
+    parser.add_argument("-s", "--max-file-bytes", type=_positive_int, default=50_000, help="Skip files larger than this size")
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
-    args = build_parser().parse_args(argv)
+    parser = build_parser()
+    args = parser.parse_args(argv)
     root = Path(args.path).resolve()
+    if not root.exists():
+        parser.error(f"Project path does not exist: {root}")
+    if not root.is_dir():
+        parser.error(f"Project path must be a directory: {root}")
+
     error_log = None
     if args.error_file:
-        error_log = Path(args.error_file).read_text(encoding="utf-8", errors="replace")
+        error_path = Path(args.error_file).resolve()
+        if not error_path.exists():
+            parser.error(f"Error log does not exist: {error_path}")
+        if not error_path.is_file():
+            parser.error(f"Error log must be a file: {error_path}")
+        error_log = error_path.read_text(encoding="utf-8", errors="replace")
 
     scan = scan_project(
         root,
@@ -52,6 +63,16 @@ def main(argv: list[str] | None = None) -> int:
     print(f"Tokens estimate: {estimate_tokens(output):,}")
     print(f"Files included: {len(scan.files)}")
     return 0
+
+
+def _positive_int(value: str) -> int:
+    try:
+        number = int(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("must be an integer") from exc
+    if number <= 0:
+        raise argparse.ArgumentTypeError("must be greater than 0")
+    return number
 
 
 def _copy_to_clipboard(text: str) -> None:

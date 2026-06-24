@@ -107,6 +107,7 @@ def scan_project(
 ) -> ScanResult:
     root_path = Path(root).resolve()
     exclude_patterns = exclude or []
+    gitignore_patterns = _read_gitignore_patterns(root_path)
     include_patterns = include or []
 
     files: list[ProjectFile] = []
@@ -115,7 +116,7 @@ def scan_project(
 
     for path in sorted(root_path.rglob("*")):
         rel = path.relative_to(root_path).as_posix()
-        if _is_excluded(path, rel, root_path, exclude_patterns):
+        if _is_excluded(path, rel, root_path, exclude_patterns, gitignore_patterns):
             continue
         if path.is_dir():
             tree_paths.append(rel + "/")
@@ -146,13 +147,34 @@ def scan_project(
     )
 
 
-def _is_excluded(path: Path, rel: str, root: Path, extra_patterns: list[str]) -> bool:
+def _read_gitignore_patterns(root: Path) -> list[str]:
+    gitignore = root / ".gitignore"
+    if not gitignore.exists():
+        return []
+
+    patterns: list[str] = []
+    for line in gitignore.read_text(encoding="utf-8", errors="replace").splitlines():
+        pattern = line.strip()
+        if not pattern or pattern.startswith("#") or pattern.startswith("!"):
+            continue
+        patterns.append(pattern.lstrip("/"))
+    return patterns
+
+
+def _is_excluded(
+    path: Path,
+    rel: str,
+    root: Path,
+    extra_patterns: list[str],
+    gitignore_patterns: list[str] | None = None,
+) -> bool:
     parts = set(path.relative_to(root).parts)
     if parts & DEFAULT_EXCLUDED_DIRS:
         return True
     if path.name in DEFAULT_EXCLUDED_FILES:
         return True
-    return _matches_any(rel, extra_patterns)
+    patterns = extra_patterns + (gitignore_patterns or [])
+    return _matches_any(rel, patterns)
 
 
 def _matches_any(rel: str, patterns: list[str]) -> bool:
@@ -161,7 +183,10 @@ def _matches_any(rel: str, patterns: list[str]) -> bool:
         pattern = pattern.strip()
         if not pattern:
             continue
+        normalized = pattern.rstrip("/")
         if fnmatch.fnmatch(rel, pattern) or path.match(pattern):
+            return True
+        if normalized and (rel == normalized or rel.startswith(normalized + "/")):
             return True
         if "**/" in pattern and fnmatch.fnmatch(rel, pattern.replace("**/", "")):
             return True
