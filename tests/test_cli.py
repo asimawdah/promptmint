@@ -46,6 +46,47 @@ class CliTest(unittest.TestCase):
             self.assertIn("app.py", text)
             self.assertNotIn("notes.md", text)
 
+    def test_cli_writes_prompt_metadata_and_variables(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            output = root / "context.md"
+            (root / "app.py").write_text("print('hello')\n", encoding="utf-8")
+
+            exit_code = main([
+                str(root),
+                "--goal", "Review auth flow",
+                "--require", "ticket",
+                "--var", "ticket=AUTH-123",
+                "--output", str(output),
+            ])
+
+            self.assertEqual(exit_code, 0)
+            text = output.read_text(encoding="utf-8")
+            self.assertIn("## Prompt Metadata", text)
+            self.assertIn("Required variables: `ticket`", text)
+            self.assertIn("Provided variables: `ticket`", text)
+            self.assertIn("`ticket`: AUTH-123", text)
+
+    def test_cli_rejects_missing_required_variable(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "app.py").write_text("print('hello')\n", encoding="utf-8")
+
+            with self.assertRaises(SystemExit) as context:
+                main([str(root), "--require", "ticket"])
+
+            self.assertNotEqual(context.exception.code, 0)
+
+    def test_cli_rejects_invalid_variable_assignment(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "app.py").write_text("print('hello')\n", encoding="utf-8")
+
+            with self.assertRaises(SystemExit) as context:
+                main([str(root), "--var", "ticket"])
+
+            self.assertNotEqual(context.exception.code, 0)
+
     def test_cli_rejects_missing_project_path(self):
         with tempfile.TemporaryDirectory() as tmp:
             missing = Path(tmp) / "missing"
