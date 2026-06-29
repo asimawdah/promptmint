@@ -65,7 +65,7 @@ class CliTest(unittest.TestCase):
             self.assertIn("## Prompt Metadata", text)
             self.assertIn("Required variables: `ticket`", text)
             self.assertIn("Provided variables: `ticket`", text)
-            self.assertIn("`ticket`: AUTH-123", text)
+            self.assertIn("- `ticket`:\n```text\nAUTH-123\n```", text)
 
     def test_cli_rejects_missing_required_variable(self):
         with tempfile.TemporaryDirectory() as tmp:
