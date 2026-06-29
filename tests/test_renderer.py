@@ -48,7 +48,26 @@ class RenderContextPackTest(unittest.TestCase):
         self.assertIn("- Files included: `1`", output)
         self.assertIn("- Required variables: `ticket`", output)
         self.assertIn("## Prompt Variables", output)
-        self.assertIn("- `ticket`: APP-42", output)
+        self.assertIn("- `ticket`:\n```text\nAPP-42\n```", output)
+
+    def test_render_context_pack_fences_prompt_variables_safely(self):
+        scan = ScanResult(
+            root="/project",
+            tree="app.py",
+            files=[ProjectFile(relative_path="app.py", language="python", content="print('hello')\n")],
+            dependency_files=[],
+            git_diff="",
+        )
+
+        output = render_context_pack(
+            scan,
+            goal="Review task",
+            mode="review",
+            prompt_variables={"notes": "line one\n```\nline two"},
+        )
+
+        self.assertIn("- `notes`:", output)
+        self.assertIn("````text\nline one\n```\nline two\n````", output)
 
 
 if __name__ == "__main__":
