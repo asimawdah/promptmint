@@ -55,6 +55,30 @@ Examples:
 - `reviewer=asim`
 - `env=staging`
 
+## Markdown-safe output
+
+Prompt variable values are rendered as fenced `text` blocks in the generated Markdown instead of inline raw text. This keeps the context pack readable and prevents multiline values or values containing backticks from breaking the surrounding Markdown.
+
+Example output:
+
+````markdown
+## Prompt Variables
+
+- `ticket`:
+```text
+BUG-18
+```
+
+- `notes`:
+````text
+Line one
+```
+Line two
+````
+````
+
+PromptMint automatically chooses a longer fence when the value already contains triple backticks.
+
 ## Recommended workflow
 
 1. Decide which metadata fields are required for the task.
