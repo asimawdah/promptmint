@@ -40,7 +40,7 @@ def render_context_pack(
         sections.append("## Prompt Variables")
         sections.append("")
         for name in sorted(prompt_variables):
-            sections.append(f"- `{name}`: {prompt_variables[name]}")
+            sections.extend(_render_prompt_variable(name, prompt_variables[name]))
         sections.append("")
     sections.extend(["## Project Root", f"`{scan.root}`", ""])
     sections.extend(["## Project Tree", "```text", scan.tree or "(empty)", "```", ""])
@@ -69,6 +69,29 @@ def render_context_pack(
 
     sections.extend(["## Final Instruction", MODE_REQUESTS[mode], ""])
     return "\n".join(sections).rstrip() + "\n"
+
+
+def _render_prompt_variable(name: str, value: str) -> list[str]:
+    return [f"- `{name}`:", _fenced_text_block(value)]
+
+
+def _fenced_text_block(value: str) -> str:
+    normalized = value.replace("\r\n", "\n").replace("\r", "\n")
+    longest_backtick_run = _longest_repeated_char_run(normalized, "`")
+    fence = "`" * max(3, longest_backtick_run + 1)
+    return f"{fence}text\n{normalized}\n{fence}"
+
+
+def _longest_repeated_char_run(value: str, char: str) -> int:
+    longest = 0
+    current = 0
+    for value_char in value:
+        if value_char == char:
+            current += 1
+            longest = max(longest, current)
+        else:
+            current = 0
+    return longest
 
 
 def _render_file(file: ProjectFile) -> list[str]:
