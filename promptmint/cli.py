@@ -6,6 +6,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+from .metadata import missing_required_variables, normalize_required_variables, parse_variable_assignments
 from .renderer import MODE_REQUESTS, render_context_pack
 from .scanner import scan_project
 from .tokens import estimate_tokens
@@ -25,6 +26,20 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("-o", "--output", default="promptmint-output.md", help="Output Markdown file")
     parser.add_argument("-c", "--copy", action="store_true", help="Copy output to clipboard if a clipboard tool is available")
     parser.add_argument("-s", "--max-file-bytes", type=_positive_int, default=50_000, help="Skip files larger than this size")
+    parser.add_argument(
+        "--require",
+        action="append",
+        default=[],
+        metavar="NAME",
+        help="Required prompt variable name; can be repeated and must be supplied with --var",
+    )
+    parser.add_argument(
+        "--var",
+        action="append",
+        default=[],
+        metavar="NAME=VALUE",
+        help="Prompt variable metadata to include in the generated pack; can be repeated",
+    )
     return parser
 
 
@@ -36,6 +51,16 @@ def main(argv: list[str] | None = None) -> int:
         parser.error(f"Project path does not exist: {root}")
     if not root.is_dir():
         parser.error(f"Project path must be a directory: {root}")
+
+    try:
+        required_variables = normalize_required_variables(args.require)
+        prompt_variables = parse_variable_assignments(args.var)
+    except ValueError as exc:
+        parser.error(str(exc))
+
+    missing_variables = missing_required_variables(required_variables, prompt_variables)
+    if missing_variables:
+        parser.error("Missing required prompt variables: " + ", ".join(missing_variables))
 
     error_log = None
     if args.error_file:
@@ -52,7 +77,14 @@ def main(argv: list[str] | None = None) -> int:
         exclude=args.exclude,
         max_file_bytes=args.max_file_bytes,
     )
-    output = render_context_pack(scan, goal=args.goal, mode=args.mode, error_log=error_log)
+    output = render_context_pack(
+        scan,
+        goal=args.goal,
+        mode=args.mode,
+        error_log=error_log,
+        required_variables=required_variables,
+        prompt_variables=prompt_variables,
+    )
     output_path = Path(args.output).resolve()
     output_path.write_text(output, encoding="utf-8")
 
