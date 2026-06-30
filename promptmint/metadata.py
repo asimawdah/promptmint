@@ -49,6 +49,8 @@ def parse_variable_assignments(values: list[str] | None) -> dict[str, str]:
     variables: dict[str, str] = {}
     for value in values or []:
         name, assigned_value = parse_variable_assignment(value)
+        if name in variables:
+            raise ValueError(f"duplicate prompt variable: {name}")
         variables[name] = assigned_value
     return variables
 
