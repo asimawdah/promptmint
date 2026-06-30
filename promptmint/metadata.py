@@ -58,8 +58,7 @@ def parse_variable_assignments(values: list[str] | None) -> dict[str, str]:
 def normalize_required_variables(values: list[str] | None) -> tuple[str, ...]:
     normalized: list[str] = []
     seen: set[str] = set()
-    for value in values or []:
-        name = value.strip()
+    for name in _iter_required_variable_names(values):
         if not name:
             raise ValueError("required variable name cannot be empty")
         if not _is_safe_variable_name(name):
@@ -72,6 +71,15 @@ def normalize_required_variables(values: list[str] | None) -> tuple[str, ...]:
 
 def missing_required_variables(required: tuple[str, ...], provided: dict[str, str]) -> list[str]:
     return [name for name in required if not provided.get(name)]
+
+
+def _iter_required_variable_names(values: list[str] | None) -> list[str]:
+    names: list[str] = []
+    for value in values or []:
+        parts = value.split(",")
+        for part in parts:
+            names.append(part.strip())
+    return names
 
 
 def _is_safe_variable_name(name: str) -> bool:
