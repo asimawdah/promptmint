@@ -31,6 +31,17 @@ promptmint . \
   --var area=login
 ```
 
+You can also use comma-separated shorthand for compact scripts:
+
+```bash
+promptmint . \
+  --mode review \
+  --goal "Review the login changes" \
+  --require ticket,area \
+  --var ticket=AUTH-123 \
+  --var area=login
+```
+
 If `ticket` or `area` is missing or empty, PromptMint exits with a clear CLI error before writing an incomplete pack.
 
 ## Variable format
@@ -82,7 +93,7 @@ PromptMint automatically chooses a longer fence when the value already contains 
 ## Recommended workflow
 
 1. Decide which metadata fields are required for the task.
-2. Pass those names through `--require`.
+2. Pass those names through `--require` or `--require ticket,area`.
 3. Pass values through `--var NAME=VALUE`.
 4. Review the generated `Prompt Metadata` and `Prompt Variables` sections before sharing the pack.
 
@@ -105,7 +116,7 @@ Review a pull request:
 promptmint . \
   --mode review \
   --goal "Review this PR for correctness and security" \
-  --require pr \
+  --require pr,area \
   --var pr=42 \
   --var area=auth
 ```
