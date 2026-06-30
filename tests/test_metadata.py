@@ -16,6 +16,17 @@ class PromptMetadataTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             parse_variable_assignment("ticket")
 
+    def test_parse_variable_assignment_rejects_names_without_alphanumeric_prefix(self):
+        for value in ["-=bad", "_secret=value", "-flag=value"]:
+            with self.subTest(value=value):
+                with self.assertRaisesRegex(ValueError, "must start with a letter or number"):
+                    parse_variable_assignment(value)
+
+    def test_parse_variable_assignment_allows_safe_internal_separators(self):
+        self.assertEqual(parse_variable_assignment("ticket-id=APP-42"), ("ticket-id", "APP-42"))
+        self.assertEqual(parse_variable_assignment("area_name=cli"), ("area_name", "cli"))
+        self.assertEqual(parse_variable_assignment("r2d2=bot"), ("r2d2", "bot"))
+
     def test_parse_variable_assignments_rejects_duplicate_values(self):
         with self.assertRaisesRegex(ValueError, "duplicate prompt variable: ticket"):
             parse_variable_assignments(["ticket=APP-1", "ticket=APP-2", "area=cli"])
@@ -39,6 +50,10 @@ class PromptMetadataTest(unittest.TestCase):
     def test_normalize_required_variables_rejects_empty_shorthand_segments(self):
         with self.assertRaisesRegex(ValueError, "required variable name cannot be empty"):
             normalize_required_variables(["ticket,,area"])
+
+    def test_normalize_required_variables_rejects_option_like_names(self):
+        with self.assertRaisesRegex(ValueError, "must start with a letter or number"):
+            normalize_required_variables(["ticket,-flag"])
 
     def test_missing_required_variables_treats_empty_values_as_missing(self):
         missing = missing_required_variables(("ticket", "area"), {"ticket": "APP-1", "area": ""})
