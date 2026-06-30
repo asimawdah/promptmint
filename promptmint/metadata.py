@@ -41,7 +41,9 @@ def parse_variable_assignment(value: str) -> tuple[str, str]:
     if not name:
         raise ValueError("variable name cannot be empty")
     if not _is_safe_variable_name(name):
-        raise ValueError("variable names may contain only letters, numbers, underscores, and dashes")
+        raise ValueError(
+            "variable names must start with a letter or number and may contain only letters, numbers, underscores, and dashes"
+        )
     return name, assigned_value.strip()
 
 
@@ -62,7 +64,9 @@ def normalize_required_variables(values: list[str] | None) -> tuple[str, ...]:
         if not name:
             raise ValueError("required variable name cannot be empty")
         if not _is_safe_variable_name(name):
-            raise ValueError("required variable names may contain only letters, numbers, underscores, and dashes")
+            raise ValueError(
+                "required variable names must start with a letter or number and may contain only letters, numbers, underscores, and dashes"
+            )
         if name not in seen:
             normalized.append(name)
             seen.add(name)
@@ -83,4 +87,6 @@ def _iter_required_variable_names(values: list[str] | None) -> list[str]:
 
 
 def _is_safe_variable_name(name: str) -> bool:
+    if not name or not name[0].isalnum():
+        return False
     return all(char.isalnum() or char in {"_", "-"} for char in name)
