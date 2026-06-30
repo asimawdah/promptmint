@@ -16,10 +16,14 @@ class PromptMetadataTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             parse_variable_assignment("ticket")
 
-    def test_parse_variable_assignments_overrides_duplicate_values(self):
-        variables = parse_variable_assignments(["ticket=APP-1", "ticket=APP-2", "area=cli"])
+    def test_parse_variable_assignments_rejects_duplicate_values(self):
+        with self.assertRaisesRegex(ValueError, "duplicate prompt variable: ticket"):
+            parse_variable_assignments(["ticket=APP-1", "ticket=APP-2", "area=cli"])
 
-        self.assertEqual(variables["ticket"], "APP-2")
+    def test_parse_variable_assignments_keeps_unique_values(self):
+        variables = parse_variable_assignments(["ticket=APP-1", "area=cli"])
+
+        self.assertEqual(variables["ticket"], "APP-1")
         self.assertEqual(variables["area"], "cli")
 
     def test_normalize_required_variables_deduplicates_in_order(self):
