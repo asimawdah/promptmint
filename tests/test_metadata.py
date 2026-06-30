@@ -31,6 +31,15 @@ class PromptMetadataTest(unittest.TestCase):
 
         self.assertEqual(required, ("ticket", "area"))
 
+    def test_normalize_required_variables_supports_comma_separated_shorthand(self):
+        required = normalize_required_variables(["ticket, area", "env", "ticket"])
+
+        self.assertEqual(required, ("ticket", "area", "env"))
+
+    def test_normalize_required_variables_rejects_empty_shorthand_segments(self):
+        with self.assertRaisesRegex(ValueError, "required variable name cannot be empty"):
+            normalize_required_variables(["ticket,,area"])
+
     def test_missing_required_variables_treats_empty_values_as_missing(self):
         missing = missing_required_variables(("ticket", "area"), {"ticket": "APP-1", "area": ""})
 
