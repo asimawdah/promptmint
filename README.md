@@ -51,7 +51,7 @@ promptmint . \
   --var area=login
 ```
 
-If a required variable is missing or empty, PromptMint exits before writing an incomplete context pack.
+If a required variable is missing or empty, PromptMint exits before writing an incomplete context pack. Duplicate variable names are also rejected so metadata cannot be overwritten accidentally.
 
 ## CLI Shortcuts
 
@@ -64,7 +64,7 @@ If a required variable is missing or empty, PromptMint exits before writing an i
 - `-c`, `--copy`: copy output to clipboard
 - `-s`, `--max-file-bytes`: skip files larger than this size
 - `--require`: required prompt variable name; can be repeated
-- `--var`: prompt variable metadata in `NAME=VALUE` format; can be repeated
+- `--var`: prompt variable metadata in `NAME=VALUE` format; can be repeated, but each name must be unique
 
 ## Modes
 
