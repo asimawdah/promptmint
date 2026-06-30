@@ -52,16 +52,19 @@ Variables use `NAME=VALUE` format:
 --var ticket=BUG-18 --var area=scanner --var env=local
 ```
 
-Variable names may contain:
+Variable names must start with a letter or number. After the first character, names may contain:
 
 - letters
 - numbers
 - underscores
 - dashes
 
+This rejects ambiguous option-like names such as `-flag` or `-`, while still allowing stable workflow names such as `ticket-id` and `area_name`.
+
 Examples:
 
 - `ticket=BUG-18`
+- `ticket-id=BUG-18`
 - `area=onboarding`
 - `reviewer=asim`
 - `env=staging`
