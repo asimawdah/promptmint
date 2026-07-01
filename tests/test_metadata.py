@@ -1,6 +1,7 @@
 import unittest
 
 from promptmint.metadata import (
+    PROMPT_METADATA_SCHEMA_VERSION,
     PromptMetadata,
     missing_required_variables,
     normalize_required_variables,
@@ -75,9 +76,28 @@ class PromptMetadataTest(unittest.TestCase):
         text = "\n".join(metadata.to_markdown_lines())
 
         self.assertIn("## Prompt Metadata", text)
+        self.assertIn(f"Schema version: `{PROMPT_METADATA_SCHEMA_VERSION}`", text)
         self.assertIn("Mode: `debug`", text)
         self.assertIn("Files included: `2`", text)
+        self.assertIn("Variable validation: `complete`", text)
+        self.assertIn("Required variable count: `1`", text)
+        self.assertIn("Provided variable count: `1`", text)
         self.assertIn("Required variables: `ticket`", text)
+
+    def test_metadata_marks_incomplete_when_required_names_are_missing(self):
+        metadata = PromptMetadata(
+            mode="debug",
+            goal_present=False,
+            file_count=0,
+            dependency_file_count=0,
+            includes_git_diff=False,
+            includes_error_log=False,
+            required_variables=("ticket", "area"),
+            provided_variables=("ticket",),
+        )
+
+        self.assertEqual(metadata.validation_status, "incomplete")
+        self.assertIn("Variable validation: `incomplete`", "\n".join(metadata.to_markdown_lines()))
 
 
 if __name__ == "__main__":
