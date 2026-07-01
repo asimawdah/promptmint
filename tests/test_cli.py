@@ -117,6 +117,50 @@ class CliTest(unittest.TestCase):
 
             self.assertNotEqual(context.exception.code, 0)
 
+    def test_cli_creates_output_parent_directories(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            output = root / "reports" / "review" / "context.markdown"
+            (root / "app.py").write_text("print('hello')\n", encoding="utf-8")
+
+            exit_code = main([str(root), "--goal", "Review app", "--output", str(output)])
+
+            self.assertEqual(exit_code, 0)
+            self.assertTrue(output.exists())
+            self.assertIn("Review app", output.read_text(encoding="utf-8"))
+
+    def test_cli_rejects_directory_output_path(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "app.py").write_text("print('hello')\n", encoding="utf-8")
+
+            with self.assertRaises(SystemExit) as context:
+                main([str(root), "--output", str(root)])
+
+            self.assertNotEqual(context.exception.code, 0)
+
+    def test_cli_rejects_non_markdown_output_extension(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "app.py").write_text("print('hello')\n", encoding="utf-8")
+
+            with self.assertRaises(SystemExit) as context:
+                main([str(root), "--output", str(root / "context.txt")])
+
+            self.assertNotEqual(context.exception.code, 0)
+
+    def test_cli_rejects_file_as_output_parent(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            parent_file = root / "not-a-directory"
+            parent_file.write_text("not a directory\n", encoding="utf-8")
+            (root / "app.py").write_text("print('hello')\n", encoding="utf-8")
+
+            with self.assertRaises(SystemExit) as context:
+                main([str(root), "--output", str(parent_file / "context.md")])
+
+            self.assertNotEqual(context.exception.code, 0)
+
 
 if __name__ == "__main__":
     unittest.main()
