@@ -74,10 +74,11 @@ def main(argv: list[str] | None = None) -> int:
             parser.error(f"Error log must be a file: {error_path}")
         error_log = error_path.read_text(encoding="utf-8", errors="replace")
 
+    exclude_patterns = _exclude_generated_output(args.exclude, root, output_path)
     scan = scan_project(
         root,
         include=args.include,
-        exclude=args.exclude,
+        exclude=exclude_patterns,
         max_file_bytes=args.max_file_bytes,
     )
     output = render_context_pack(
@@ -110,6 +111,19 @@ def _resolve_output_path(value: str) -> Path:
     if output_path.parent.exists() and not output_path.parent.is_dir():
         raise ValueError(f"Output parent path must be a directory: {output_path.parent}")
     return output_path
+
+
+def _exclude_generated_output(exclude_patterns: list[str], root: Path, output_path: Path) -> list[str]:
+    """Return user exclusions plus the output file when it lives inside the scan root."""
+
+    patterns = list(exclude_patterns)
+    try:
+        output_rel = output_path.relative_to(root).as_posix()
+    except ValueError:
+        return patterns
+    if output_rel and output_rel not in patterns:
+        patterns.append(output_rel)
+    return patterns
 
 
 def _positive_int(value: str) -> int:
