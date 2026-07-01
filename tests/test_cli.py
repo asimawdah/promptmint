@@ -129,6 +129,22 @@ class CliTest(unittest.TestCase):
             self.assertTrue(output.exists())
             self.assertIn("Review app", output.read_text(encoding="utf-8"))
 
+    def test_cli_excludes_existing_output_file_from_scan(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            output = root / "reports" / "review" / "context.md"
+            output.parent.mkdir(parents=True)
+            output.write_text("stale generated context that must not be rescanned\n", encoding="utf-8")
+            (root / "app.py").write_text("print('hello')\n", encoding="utf-8")
+
+            exit_code = main([str(root), "--goal", "Refresh context", "--output", str(output)])
+
+            self.assertEqual(exit_code, 0)
+            text = output.read_text(encoding="utf-8")
+            self.assertIn("app.py", text)
+            self.assertNotIn("stale generated context that must not be rescanned", text)
+            self.assertNotIn("reports/review/context.md", text)
+
     def test_cli_rejects_directory_output_path(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
