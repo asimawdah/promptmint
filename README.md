@@ -61,7 +61,7 @@ If a required variable is missing or empty, PromptMint exits before writing an i
 - `-i`, `--include`: include glob, repeatable
 - `-x`, `--exclude`: exclude glob, repeatable
 - `-o`, `--output`: output Markdown file
-- `-c`, `--copy`: copy output to clipboard
+- `-c`, `--copy`: copy output to clipboard if a clipboard tool is available
 - `-s`, `--max-file-bytes`: skip files larger than this size
 - `--require`: required prompt variable name; can be repeated
 - `--var`: prompt variable metadata in `NAME=VALUE` format; can be repeated, but each name must be unique
@@ -77,10 +77,12 @@ If a required variable is missing or empty, PromptMint exits before writing an i
 
 Every generated context pack now includes a `Prompt Metadata` section with:
 
+- schema version for future-compatible metadata changes
 - selected mode
 - whether a goal was provided
 - included file and dependency counts
 - whether git diff or error logs are present
+- variable validation status and variable counts
 - required and provided variable names when supplied
 
 Use metadata for repeatable workflows where the generated prompt should stay connected to an issue, PR, feature area, reviewer, or environment.
