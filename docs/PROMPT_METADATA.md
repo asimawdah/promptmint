@@ -6,16 +6,40 @@ PromptMint context packs are easier to review and reuse when the generated Markd
 
 Generated packs include a `Prompt Metadata` section with:
 
+- metadata schema version
 - selected mode
 - whether a goal was provided
 - number of files included
 - number of dependency files included
 - whether git diff is present
 - whether an error log is present
+- variable validation status
+- required and provided variable counts
 - required variable names
 - provided variable names
 
 This makes the output easier to audit before it is pasted into an AI tool.
+
+Example:
+
+```markdown
+## Prompt Metadata
+
+- Schema version: `1`
+- Mode: `review`
+- Goal provided: `true`
+- Files included: `12`
+- Dependency files included: `2`
+- Includes git diff: `true`
+- Includes error log: `false`
+- Variable validation: `complete`
+- Required variable count: `2`
+- Provided variable count: `3`
+- Required variables: `ticket, area`
+- Provided variables: `area, owner, ticket`
+```
+
+`Variable validation` is `complete` when every required variable name is present in the generated metadata. It is `incomplete` only when metadata is constructed programmatically with missing required names; the CLI exits before writing output in that case.
 
 ## Required variables
 
@@ -84,11 +108,11 @@ BUG-18
 ```
 
 - `notes`:
-````text
+`````text
 Line one
 ```
 Line two
-````
+`````
 ````
 
 PromptMint automatically chooses a longer fence when the value already contains triple backticks.
@@ -99,6 +123,7 @@ PromptMint automatically chooses a longer fence when the value already contains 
 2. Pass those names through `--require` or `--require ticket,area`.
 3. Pass values through `--var NAME=VALUE`.
 4. Review the generated `Prompt Metadata` and `Prompt Variables` sections before sharing the pack.
+5. Check that `Variable validation` is `complete` and the required/provided counts match the expected workflow fields.
 
 ## Safe examples
 
