@@ -50,13 +50,7 @@ def parse_variable_assignment(value: str) -> tuple[str, str]:
     if "=" not in value:
         raise ValueError("variables must use NAME=VALUE format")
     name, assigned_value = value.split("=", 1)
-    name = name.strip()
-    if not name:
-        raise ValueError("variable name cannot be empty")
-    if not _is_safe_variable_name(name):
-        raise ValueError(
-            "variable names must start with a letter or number and may contain only letters, numbers, underscores, and dashes"
-        )
+    name = canonical_prompt_variable_name(name)
     return name, assigned_value.strip()
 
 
@@ -74,20 +68,30 @@ def normalize_required_variables(values: list[str] | None) -> tuple[str, ...]:
     normalized: list[str] = []
     seen: set[str] = set()
     for name in _iter_required_variable_names(values):
-        if not name:
-            raise ValueError("required variable name cannot be empty")
-        if not _is_safe_variable_name(name):
-            raise ValueError(
-                "required variable names must start with a letter or number and may contain only letters, numbers, underscores, and dashes"
-            )
-        if name not in seen:
-            normalized.append(name)
-            seen.add(name)
+        canonical_name = canonical_prompt_variable_name(name, required=True)
+        if canonical_name not in seen:
+            normalized.append(canonical_name)
+            seen.add(canonical_name)
     return tuple(normalized)
 
 
 def missing_required_variables(required: tuple[str, ...], provided: dict[str, str]) -> list[str]:
     return [name for name in required if not provided.get(name)]
+
+
+def canonical_prompt_variable_name(name: str, *, required: bool = False) -> str:
+    """Return a stable lowercase metadata variable name or raise ValueError."""
+
+    stripped_name = name.strip()
+    label = "required variable name" if required else "variable name"
+    if not stripped_name:
+        raise ValueError(f"{label} cannot be empty")
+    if not _is_safe_variable_name(stripped_name):
+        plural_label = "required variable names" if required else "variable names"
+        raise ValueError(
+            f"{plural_label} must start with a letter or number and may contain only letters, numbers, underscores, and dashes"
+        )
+    return stripped_name.lower()
 
 
 def _iter_required_variable_names(values: list[str] | None) -> list[str]:
