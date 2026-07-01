@@ -3,6 +3,9 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 
+PROMPT_METADATA_SCHEMA_VERSION = 1
+
+
 @dataclass(frozen=True)
 class PromptMetadata:
     mode: str
@@ -13,17 +16,27 @@ class PromptMetadata:
     includes_error_log: bool
     required_variables: tuple[str, ...] = field(default_factory=tuple)
     provided_variables: tuple[str, ...] = field(default_factory=tuple)
+    schema_version: int = PROMPT_METADATA_SCHEMA_VERSION
+
+    @property
+    def validation_status(self) -> str:
+        missing = set(self.required_variables) - set(self.provided_variables)
+        return "incomplete" if missing else "complete"
 
     def to_markdown_lines(self) -> list[str]:
         lines = [
             "## Prompt Metadata",
             "",
+            f"- Schema version: `{self.schema_version}`",
             f"- Mode: `{self.mode}`",
             f"- Goal provided: `{str(self.goal_present).lower()}`",
             f"- Files included: `{self.file_count}`",
             f"- Dependency files included: `{self.dependency_file_count}`",
             f"- Includes git diff: `{str(self.includes_git_diff).lower()}`",
             f"- Includes error log: `{str(self.includes_error_log).lower()}`",
+            f"- Variable validation: `{self.validation_status}`",
+            f"- Required variable count: `{len(self.required_variables)}`",
+            f"- Provided variable count: `{len(self.provided_variables)}`",
         ]
         if self.required_variables:
             lines.append(f"- Required variables: `{', '.join(self.required_variables)}`")
