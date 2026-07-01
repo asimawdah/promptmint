@@ -3,6 +3,7 @@ import unittest
 from promptmint.metadata import (
     PROMPT_METADATA_SCHEMA_VERSION,
     PromptMetadata,
+    canonical_prompt_variable_name,
     missing_required_variables,
     normalize_required_variables,
     parse_variable_assignment,
@@ -28,9 +29,17 @@ class PromptMetadataTest(unittest.TestCase):
         self.assertEqual(parse_variable_assignment("area_name=cli"), ("area_name", "cli"))
         self.assertEqual(parse_variable_assignment("r2d2=bot"), ("r2d2", "bot"))
 
+    def test_parse_variable_assignment_canonicalizes_names(self):
+        self.assertEqual(parse_variable_assignment(" Ticket-ID = APP-42 "), ("ticket-id", "APP-42"))
+        self.assertEqual(canonical_prompt_variable_name("Area_Name"), "area_name")
+
     def test_parse_variable_assignments_rejects_duplicate_values(self):
         with self.assertRaisesRegex(ValueError, "duplicate prompt variable: ticket"):
             parse_variable_assignments(["ticket=APP-1", "ticket=APP-2", "area=cli"])
+
+    def test_parse_variable_assignments_rejects_case_variant_duplicates(self):
+        with self.assertRaisesRegex(ValueError, "duplicate prompt variable: ticket"):
+            parse_variable_assignments(["Ticket=APP-1", "ticket=APP-2"])
 
     def test_parse_variable_assignments_keeps_unique_values(self):
         variables = parse_variable_assignments(["ticket=APP-1", "area=cli"])
@@ -42,6 +51,11 @@ class PromptMetadataTest(unittest.TestCase):
         required = normalize_required_variables(["ticket", "area", "ticket"])
 
         self.assertEqual(required, ("ticket", "area"))
+
+    def test_normalize_required_variables_canonicalizes_case_variants(self):
+        required = normalize_required_variables(["Ticket, Area", "ticket", "OWNER"])
+
+        self.assertEqual(required, ("ticket", "area", "owner"))
 
     def test_normalize_required_variables_supports_comma_separated_shorthand(self):
         required = normalize_required_variables(["ticket, area", "env", "ticket"])
