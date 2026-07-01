@@ -61,7 +61,7 @@ If a required variable is missing or empty, PromptMint exits before writing an i
 - `-e`, `--error`: error log file
 - `-i`, `--include`: include glob, repeatable
 - `-x`, `--exclude`: exclude glob, repeatable
-- `-o`, `--output`: output Markdown file; must end in `.md` or `.markdown`; missing parent directories are created
+- `-o`, `--output`: output Markdown file; must end in `.md` or `.markdown`; missing parent directories are created; existing output files inside the scanned project are excluded from the scan
 - `-c`, `--copy`: copy output to clipboard if a clipboard tool is available
 - `-s`, `--max-file-bytes`: skip files larger than this size
 - `--require`: required prompt variable name; can be repeated
@@ -114,6 +114,7 @@ See [Prompt Metadata and Validation](docs/PROMPT_METADATA.md) for details.
 - `.env` files
 - Binary files
 - Large files over 50KB by default
+- The generated `--output` file when it already exists inside the scanned project
 
 ## Safety notes
 
@@ -125,7 +126,8 @@ Recommended safe workflow:
 2. Open the generated Markdown and check for secrets, tokens, private URLs, or customer data.
 3. Add extra `--exclude` patterns for anything that should never leave your machine.
 4. Write the pack to an explicit Markdown path such as `reports/BUG-18-debug.md`.
-5. Commit a project-level `.gitignore` and keep secrets in ignored `.env` files.
+5. Re-run to the same output path safely when needed; PromptMint excludes that generated file from the scan.
+6. Commit a project-level `.gitignore` and keep secrets in ignored `.env` files.
 
 Example:
 
