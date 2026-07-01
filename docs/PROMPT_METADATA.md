@@ -101,6 +101,7 @@ PromptMint writes Markdown context packs, so `--output` is validated before scan
 - an existing directory cannot be used as the output target
 - an existing file cannot be used as the parent directory
 - missing parent directories are created automatically
+- an existing output file inside the scanned project is excluded from the scan automatically
 
 Valid examples:
 
@@ -117,6 +118,8 @@ promptmint . --output reports/
 ```
 
 These checks prevent accidental writes to ambiguous paths and make scripted prompt generation safer.
+
+When you repeatedly generate a pack to a path inside the project, PromptMint excludes that exact output file from the scan. This prevents stale generated Markdown from being copied into the next context pack and keeps file counts, project trees, and rendered context cleaner.
 
 ## Markdown-safe output
 
@@ -150,6 +153,7 @@ PromptMint automatically chooses a longer fence when the value already contains 
 4. Choose an explicit Markdown output path when the pack is part of a repeatable review or support workflow.
 5. Review the generated `Prompt Metadata` and `Prompt Variables` sections before sharing the pack.
 6. Check that `Variable validation` is `complete` and the required/provided counts match the expected workflow fields.
+7. Reuse the same output path safely; PromptMint excludes the existing generated file from subsequent scans.
 
 ## Safe examples
 
