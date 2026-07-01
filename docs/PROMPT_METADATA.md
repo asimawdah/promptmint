@@ -83,6 +83,8 @@ Variable names must start with a letter or number. After the first character, na
 - underscores
 - dashes
 
+PromptMint canonicalizes variable names by trimming surrounding whitespace and lowercasing names before validation output is rendered. This keeps metadata stable across scripts and prevents case variants such as `Ticket` and `ticket` from behaving like different fields.
+
 This rejects ambiguous option-like names such as `-flag` or `-`, while still allowing stable workflow names such as `ticket-id` and `area_name`.
 
 Examples:
@@ -92,6 +94,14 @@ Examples:
 - `area=onboarding`
 - `reviewer=asim`
 - `env=staging`
+
+Canonical examples:
+
+| Input | Stored metadata name |
+| --- | --- |
+| `Ticket=BUG-18` | `ticket` |
+| ` AREA_NAME = cli` | `area_name` |
+| `ticket-id=BUG-18` | `ticket-id` |
 
 ## Output path validation
 
@@ -150,10 +160,11 @@ PromptMint automatically chooses a longer fence when the value already contains 
 1. Decide which metadata fields are required for the task.
 2. Pass those names through `--require` or `--require ticket,area`.
 3. Pass values through `--var NAME=VALUE`.
-4. Choose an explicit Markdown output path when the pack is part of a repeatable review or support workflow.
-5. Review the generated `Prompt Metadata` and `Prompt Variables` sections before sharing the pack.
-6. Check that `Variable validation` is `complete` and the required/provided counts match the expected workflow fields.
-7. Reuse the same output path safely; PromptMint excludes the existing generated file from subsequent scans.
+4. Keep metadata variable names lowercase in scripts and examples for readability, even though PromptMint canonicalizes them before rendering.
+5. Choose an explicit Markdown output path when the pack is part of a repeatable review or support workflow.
+6. Review the generated `Prompt Metadata` and `Prompt Variables` sections before sharing the pack.
+7. Check that `Variable validation` is `complete` and the required/provided counts match the expected workflow fields.
+8. Reuse the same output path safely; PromptMint excludes the existing generated file from subsequent scans.
 
 ## Safe examples
 
