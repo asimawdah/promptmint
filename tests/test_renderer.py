@@ -43,9 +43,13 @@ class RenderContextPackTest(unittest.TestCase):
         )
 
         self.assertIn("## Prompt Metadata", output)
+        self.assertIn("- Schema version: `1`", output)
         self.assertIn("- Mode: `review`", output)
         self.assertIn("- Goal provided: `true`", output)
         self.assertIn("- Files included: `1`", output)
+        self.assertIn("- Variable validation: `complete`", output)
+        self.assertIn("- Required variable count: `1`", output)
+        self.assertIn("- Provided variable count: `1`", output)
         self.assertIn("- Required variables: `ticket`", output)
         self.assertIn("## Prompt Variables", output)
         self.assertIn("- `ticket`:\n```text\nAPP-42\n```", output)
