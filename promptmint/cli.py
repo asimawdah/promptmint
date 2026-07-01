@@ -11,6 +11,8 @@ from .renderer import MODE_REQUESTS, render_context_pack
 from .scanner import scan_project
 from .tokens import estimate_tokens
 
+ALLOWED_OUTPUT_SUFFIXES = {".md", ".markdown"}
+
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
@@ -55,6 +57,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         required_variables = normalize_required_variables(args.require)
         prompt_variables = parse_variable_assignments(args.var)
+        output_path = _resolve_output_path(args.output)
     except ValueError as exc:
         parser.error(str(exc))
 
@@ -85,7 +88,7 @@ def main(argv: list[str] | None = None) -> int:
         required_variables=required_variables,
         prompt_variables=prompt_variables,
     )
-    output_path = Path(args.output).resolve()
+    output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(output, encoding="utf-8")
 
     if args.copy:
@@ -95,6 +98,18 @@ def main(argv: list[str] | None = None) -> int:
     print(f"Tokens estimate: {estimate_tokens(output):,}")
     print(f"Files included: {len(scan.files)}")
     return 0
+
+
+def _resolve_output_path(value: str) -> Path:
+    output_path = Path(value).expanduser().resolve()
+    if output_path.exists() and output_path.is_dir():
+        raise ValueError(f"Output path must be a Markdown file, not a directory: {output_path}")
+    if output_path.suffix.lower() not in ALLOWED_OUTPUT_SUFFIXES:
+        allowed = ", ".join(sorted(ALLOWED_OUTPUT_SUFFIXES))
+        raise ValueError(f"Output file must use a Markdown extension ({allowed}): {output_path}")
+    if output_path.parent.exists() and not output_path.parent.is_dir():
+        raise ValueError(f"Output parent path must be a directory: {output_path.parent}")
+    return output_path
 
 
 def _positive_int(value: str) -> int:
