@@ -52,7 +52,7 @@ promptmint . \
   --output reports/AUTH-123-review.md
 ```
 
-If a required variable is missing or empty, PromptMint exits before writing an incomplete context pack. Duplicate variable names are also rejected so metadata cannot be overwritten accidentally. Variable names are canonicalized to lowercase, so case variants like `Ticket` and `ticket` are treated as the same workflow field.
+If a required variable is missing or empty, PromptMint exits before writing an incomplete context pack. Duplicate variable names are also rejected so metadata cannot be overwritten accidentally. Variable names are canonicalized to lowercase, so case variants like `Ticket` and `ticket` are treated as the same workflow field. Secret-like metadata names such as password, token, private-key, credential, or api-key are rejected because `--var` is for workflow context, not sensitive values.
 
 ## CLI Shortcuts
 
@@ -64,8 +64,8 @@ If a required variable is missing or empty, PromptMint exits before writing an i
 - `-o`, `--output`: output Markdown file; must end in `.md` or `.markdown`; missing parent directories are created; existing output files inside the scanned project are excluded from the scan
 - `-c`, `--copy`: copy output to clipboard if a clipboard tool is available
 - `-s`, `--max-file-bytes`: skip files larger than this size
-- `--require`: required prompt variable name; can be repeated; comma-separated shorthand is supported; names are canonicalized to lowercase
-- `--var`: prompt variable metadata in `NAME=VALUE` format; can be repeated, but each canonicalized name must be unique
+- `--require`: required prompt variable name; can be repeated; comma-separated shorthand is supported; names are canonicalized to lowercase and cannot look like secrets
+- `--var`: prompt variable metadata in `NAME=VALUE` format; can be repeated, but each canonicalized name must be unique and non-sensitive
 
 ## Modes
 
@@ -96,7 +96,9 @@ Recommended variable names:
 - `env` for the runtime environment
 - `owner` for the person or team responsible for follow-up
 
-See [Prompt Metadata and Validation](docs/PROMPT_METADATA.md) for details about schema fields, canonical variable names, required-variable validation, safe Markdown rendering, and output path rules.
+Avoid using `--var` for secrets, tokens, credentials, private keys, or passwords. PromptMint rejects variable names that look sensitive, but generated context packs should still be reviewed before sharing.
+
+See [Prompt Metadata and Validation](docs/PROMPT_METADATA.md) for details about schema fields, canonical variable names, required-variable validation, secret-like name rejection, safe Markdown rendering, and output path rules.
 
 ## What it includes
 
@@ -171,6 +173,7 @@ python3 -m unittest discover -s tests -v
 - [x] Debug/review/explain/refactor modes
 - [x] Prompt metadata and required variable validation
 - [x] Canonical prompt variable names
+- [x] Secret-like prompt metadata name rejection
 - [ ] Better `.gitignore` support
 - [ ] Token budget smart trimming
 - [ ] Interactive file picker
