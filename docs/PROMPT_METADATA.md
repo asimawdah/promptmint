@@ -87,6 +87,8 @@ PromptMint canonicalizes variable names by trimming surrounding whitespace and l
 
 This rejects ambiguous option-like names such as `-flag` or `-`, while still allowing stable workflow names such as `ticket-id` and `area_name`.
 
+Sensitive-looking names are rejected for both `--require` and `--var`. Prompt metadata is intended for workflow context, not confidential material. Use labels such as `ticket`, `pr`, `area`, `env`, `owner`, or `reviewer` instead.
+
 Examples:
 
 - `ticket=BUG-18`
@@ -161,10 +163,11 @@ PromptMint automatically chooses a longer fence when the value already contains 
 2. Pass those names through `--require` or `--require ticket,area`.
 3. Pass values through `--var NAME=VALUE`.
 4. Keep metadata variable names lowercase in scripts and examples for readability, even though PromptMint canonicalizes them before rendering.
-5. Choose an explicit Markdown output path when the pack is part of a repeatable review or support workflow.
-6. Review the generated `Prompt Metadata` and `Prompt Variables` sections before sharing the pack.
-7. Check that `Variable validation` is `complete` and the required/provided counts match the expected workflow fields.
-8. Reuse the same output path safely; PromptMint excludes the existing generated file from subsequent scans.
+5. Use only non-sensitive workflow fields in prompt variables; do not pass confidential material through metadata.
+6. Choose an explicit Markdown output path when the pack is part of a repeatable review or support workflow.
+7. Review the generated `Prompt Metadata` and `Prompt Variables` sections before sharing the pack.
+8. Check that `Variable validation` is `complete` and the required/provided counts match the expected workflow fields.
+9. Reuse the same output path safely; PromptMint excludes the existing generated file from subsequent scans.
 
 ## Safe examples
 
