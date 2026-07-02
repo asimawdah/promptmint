@@ -51,7 +51,7 @@ promptmint . \
   --goal "Review the login changes" \
   --require ticket \
   --require area \
-  --var ticket=AUTH-123 \
+  --var ticket=PM-123 \
   --var area=login
 ```
 
@@ -62,7 +62,7 @@ promptmint . \
   --mode review \
   --goal "Review the login changes" \
   --require ticket,area \
-  --var ticket=AUTH-123 \
+  --var ticket=PM-123 \
   --var area=login
 ```
 
@@ -104,6 +104,52 @@ Canonical examples:
 | `Ticket=BUG-18` | `ticket` |
 | ` AREA_NAME = cli` | `area_name` |
 | `ticket-id=BUG-18` | `ticket-id` |
+
+## JSON variable files
+
+Use `--vars-file` when a script or support workflow already has prompt metadata in a reusable JSON file.
+
+`prompt-vars.json`:
+
+```json
+{
+  "ticket": "PM-123",
+  "area": "login",
+  "reviewer": "asim"
+}
+```
+
+```bash
+promptmint . \
+  --mode review \
+  --goal "Review the login changes" \
+  --require ticket,area \
+  --vars-file prompt-vars.json \
+  --output reports/PM-123-review.md
+```
+
+Rules:
+
+- each variable file must contain a JSON object
+- object keys follow the same canonical name and sensitive-name rules as `--var`
+- values must be strings
+- values are trimmed before validation and rendering
+- `--vars-file` can be repeated
+- duplicate canonical names are rejected across all files and inline `--var` values
+
+This keeps scripted metadata repeatable without allowing one source to silently overwrite another.
+
+Invalid examples:
+
+```json
+["ticket", "PM-123"]
+```
+
+```json
+{
+  "ticket": 123
+}
+```
 
 ## Output path validation
 
@@ -161,7 +207,7 @@ PromptMint automatically chooses a longer fence when the value already contains 
 
 1. Decide which metadata fields are required for the task.
 2. Pass those names through `--require` or `--require ticket,area`.
-3. Pass values through `--var NAME=VALUE`.
+3. Pass values through `--var NAME=VALUE` or `--vars-file prompt-vars.json`.
 4. Keep metadata variable names lowercase in scripts and examples for readability, even though PromptMint canonicalizes them before rendering.
 5. Use only non-sensitive workflow fields in prompt variables; do not pass confidential material through metadata.
 6. Choose an explicit Markdown output path when the pack is part of a repeatable review or support workflow.
@@ -195,12 +241,12 @@ promptmint . \
   --output reports/pr-42-review.md
 ```
 
-Create an explanation pack:
+Create an explanation pack from a variables file:
 
 ```bash
 promptmint . \
   --mode explain \
   --goal "Explain the CLI architecture" \
-  --var area=cli \
+  --vars-file prompt-vars.json \
   --output reports/cli-explain.markdown
 ```
