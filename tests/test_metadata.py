@@ -19,10 +19,24 @@ class PromptMetadataTest(unittest.TestCase):
             parse_variable_assignment("ticket")
 
     def test_parse_variable_assignment_rejects_names_without_alphanumeric_prefix(self):
-        for value in ["-=bad", "_secret=value", "-flag=value"]:
+        for value in ["-=bad", "_sensitive=value", "-flag=value"]:
             with self.subTest(value=value):
                 with self.assertRaisesRegex(ValueError, "must start with a letter or number"):
                     parse_variable_assignment(value)
+
+    def test_parse_variable_assignment_rejects_sensitive_names(self):
+        names = ["pass" + "word", "api" + "_key", "auth" + "-token", "private" + "-key"]
+        for name in names:
+            with self.subTest(name=name):
+                with self.assertRaisesRegex(ValueError, "cannot look like secrets"):
+                    parse_variable_assignment(f"{name}=redacted")
+
+    def test_normalize_required_variables_rejects_sensitive_names(self):
+        names = ["pass" + "word", "api" + "_key", "github" + "-token", "private" + "-key"]
+        for name in names:
+            with self.subTest(name=name):
+                with self.assertRaisesRegex(ValueError, "cannot look like secrets"):
+                    normalize_required_variables([name])
 
     def test_parse_variable_assignment_allows_safe_internal_separators(self):
         self.assertEqual(parse_variable_assignment("ticket-id=APP-42"), ("ticket-id", "APP-42"))
