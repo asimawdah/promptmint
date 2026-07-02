@@ -1,3 +1,4 @@
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -54,9 +55,9 @@ class CliTest(unittest.TestCase):
 
             exit_code = main([
                 str(root),
-                "--goal", "Review auth flow",
+                "--goal", "Review login flow",
                 "--require", "ticket",
-                "--var", "ticket=AUTH-123",
+                "--var", "ticket=PM-123",
                 "--output", str(output),
             ])
 
@@ -65,7 +66,75 @@ class CliTest(unittest.TestCase):
             self.assertIn("## Prompt Metadata", text)
             self.assertIn("Required variables: `ticket`", text)
             self.assertIn("Provided variables: `ticket`", text)
-            self.assertIn("- `ticket`:\n```text\nAUTH-123\n```", text)
+            self.assertIn("- `ticket`:\n```text\nPM-123\n```", text)
+
+    def test_cli_loads_prompt_variables_from_json_file(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            output = root / "context.md"
+            variables = root / "prompt-vars.json"
+            (root / "app.py").write_text("print('hello')\n", encoding="utf-8")
+            variables.write_text(json.dumps({"Ticket": "PM-123", "area": " login "}), encoding="utf-8")
+
+            exit_code = main([
+                str(root),
+                "--goal", "Review login flow",
+                "--require", "ticket,area",
+                "--vars-file", str(variables),
+                "--output", str(output),
+            ])
+
+            self.assertEqual(exit_code, 0)
+            text = output.read_text(encoding="utf-8")
+            self.assertIn("Required variables: `ticket, area`", text)
+            self.assertIn("Provided variables: `area, ticket`", text)
+            self.assertIn("- `ticket`:\n```text\nPM-123\n```", text)
+            self.assertIn("- `area`:\n```text\nlogin\n```", text)
+
+    def test_cli_rejects_duplicate_prompt_variables_across_file_and_inline_values(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            variables = root / "prompt-vars.json"
+            (root / "app.py").write_text("print('hello')\n", encoding="utf-8")
+            variables.write_text(json.dumps({"ticket": "PM-123"}), encoding="utf-8")
+
+            with self.assertRaises(SystemExit) as context:
+                main([str(root), "--vars-file", str(variables), "--var", "Ticket=PM-456"])
+
+            self.assertNotEqual(context.exception.code, 0)
+
+    def test_cli_rejects_invalid_prompt_variables_file_shape(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            variables = root / "prompt-vars.json"
+            (root / "app.py").write_text("print('hello')\n", encoding="utf-8")
+            variables.write_text(json.dumps(["ticket", "PM-123"]), encoding="utf-8")
+
+            with self.assertRaises(SystemExit) as context:
+                main([str(root), "--vars-file", str(variables)])
+
+            self.assertNotEqual(context.exception.code, 0)
+
+    def test_cli_rejects_non_string_prompt_variable_file_values(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            variables = root / "prompt-vars.json"
+            (root / "app.py").write_text("print('hello')\n", encoding="utf-8")
+            variables.write_text(json.dumps({"ticket": 123}), encoding="utf-8")
+
+            with self.assertRaises(SystemExit) as context:
+                main([str(root), "--vars-file", str(variables)])
+
+            self.assertNotEqual(context.exception.code, 0)
+
+    def test_cli_rejects_missing_project_path(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            missing = Path(tmp) / "missing"
+
+            with self.assertRaises(SystemExit) as context:
+                main([str(missing)])
+
+            self.assertNotEqual(context.exception.code, 0)
 
     def test_cli_rejects_missing_required_variable(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -84,15 +153,6 @@ class CliTest(unittest.TestCase):
 
             with self.assertRaises(SystemExit) as context:
                 main([str(root), "--var", "ticket"])
-
-            self.assertNotEqual(context.exception.code, 0)
-
-    def test_cli_rejects_missing_project_path(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            missing = Path(tmp) / "missing"
-
-            with self.assertRaises(SystemExit) as context:
-                main([str(missing)])
 
             self.assertNotEqual(context.exception.code, 0)
 
