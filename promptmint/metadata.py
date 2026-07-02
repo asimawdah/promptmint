@@ -4,6 +4,18 @@ from dataclasses import dataclass, field
 
 
 PROMPT_METADATA_SCHEMA_VERSION = 1
+SENSITIVE_VARIABLE_NAME_HINTS = (
+    "api-key",
+    "apikey",
+    "auth-token",
+    "credential",
+    "credentials",
+    "jwt",
+    "password",
+    "private-key",
+    "secret",
+    "token",
+)
 
 
 @dataclass(frozen=True)
@@ -91,7 +103,13 @@ def canonical_prompt_variable_name(name: str, *, required: bool = False) -> str:
         raise ValueError(
             f"{plural_label} must start with a letter or number and may contain only letters, numbers, underscores, and dashes"
         )
-    return stripped_name.lower()
+    canonical_name = stripped_name.lower()
+    if _looks_sensitive_variable_name(canonical_name):
+        plural_label = "required variable names" if required else "variable names"
+        raise ValueError(
+            f"{plural_label} cannot look like secrets; use non-sensitive workflow metadata such as ticket, pr, area, env, owner, or reviewer"
+        )
+    return canonical_name
 
 
 def _iter_required_variable_names(values: list[str] | None) -> list[str]:
@@ -107,3 +125,9 @@ def _is_safe_variable_name(name: str) -> bool:
     if not name or not name[0].isalnum():
         return False
     return all(char.isalnum() or char in {"_", "-"} for char in name)
+
+
+def _looks_sensitive_variable_name(name: str) -> bool:
+    normalized_name = name.replace("_", "-")
+    parts = [part for part in normalized_name.split("-") if part]
+    return normalized_name in SENSITIVE_VARIABLE_NAME_HINTS or any(part in SENSITIVE_VARIABLE_NAME_HINTS for part in parts)
