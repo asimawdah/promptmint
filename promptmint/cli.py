@@ -1,12 +1,19 @@
 from __future__ import annotations
 
 import argparse
+import json
 import shutil
 import subprocess
 import sys
+from json import JSONDecodeError
 from pathlib import Path
 
-from .metadata import missing_required_variables, normalize_required_variables, parse_variable_assignments
+from .metadata import (
+    canonical_prompt_variable_name,
+    missing_required_variables,
+    normalize_required_variables,
+    parse_variable_assignments,
+)
 from .renderer import MODE_REQUESTS, render_context_pack
 from .scanner import scan_project
 from .tokens import estimate_tokens
@@ -42,6 +49,13 @@ def build_parser() -> argparse.ArgumentParser:
         metavar="NAME=VALUE",
         help="Prompt variable metadata to include in the generated pack; can be repeated",
     )
+    parser.add_argument(
+        "--vars-file",
+        action="append",
+        default=[],
+        metavar="PATH",
+        help="JSON object containing prompt variable metadata; can be repeated",
+    )
     return parser
 
 
@@ -56,7 +70,10 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         required_variables = normalize_required_variables(args.require)
-        prompt_variables = parse_variable_assignments(args.var)
+        prompt_variables = _merge_prompt_variables(
+            _load_prompt_variable_files(args.vars_file),
+            parse_variable_assignments(args.var),
+        )
         output_path = _resolve_output_path(args.output)
     except ValueError as exc:
         parser.error(str(exc))
@@ -99,6 +116,43 @@ def main(argv: list[str] | None = None) -> int:
     print(f"Tokens estimate: {estimate_tokens(output):,}")
     print(f"Files included: {len(scan.files)}")
     return 0
+
+
+def _load_prompt_variable_files(paths: list[str] | None) -> dict[str, str]:
+    variables: dict[str, str] = {}
+    for value in paths or []:
+        path = Path(value).expanduser().resolve()
+        if not path.exists():
+            raise ValueError(f"Prompt variables file does not exist: {path}")
+        if not path.is_file():
+            raise ValueError(f"Prompt variables file must be a file: {path}")
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except JSONDecodeError as exc:
+            raise ValueError(f"Prompt variables file must contain valid JSON: {path}: {exc.msg}") from exc
+        if not isinstance(data, dict):
+            raise ValueError(f"Prompt variables file must contain a JSON object: {path}")
+        variables = _merge_prompt_variables(variables, _parse_prompt_variable_file_data(data, path))
+    return variables
+
+
+def _parse_prompt_variable_file_data(data: dict[str, object], path: Path) -> dict[str, str]:
+    variables: dict[str, str] = {}
+    for raw_name, raw_value in data.items():
+        name = canonical_prompt_variable_name(raw_name)
+        if not isinstance(raw_value, str):
+            raise ValueError(f"Prompt variable '{name}' in {path} must be a string")
+        variables = _merge_prompt_variables(variables, {name: raw_value.strip()})
+    return variables
+
+
+def _merge_prompt_variables(base: dict[str, str], incoming: dict[str, str]) -> dict[str, str]:
+    duplicates = sorted(set(base).intersection(incoming))
+    if duplicates:
+        raise ValueError("duplicate prompt variable: " + ", ".join(duplicates))
+    merged = dict(base)
+    merged.update(incoming)
+    return merged
 
 
 def _resolve_output_path(value: str) -> Path:
