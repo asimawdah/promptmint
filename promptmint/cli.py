@@ -16,9 +16,12 @@ from .metadata import (
 )
 from .renderer import MODE_REQUESTS, render_context_pack
 from .scanner import scan_project
+from .templates import PromptTemplate, get_template, list_categories, list_templates, render_template_goal
 from .tokens import estimate_tokens
 
 ALLOWED_OUTPUT_SUFFIXES = {".md", ".markdown"}
+DEFAULT_TEMPLATE_CATEGORY = "all"
+TEMPLATE_LIST_FORMATS = ("text", "json")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -56,12 +59,44 @@ def build_parser() -> argparse.ArgumentParser:
         metavar="PATH",
         help="JSON object containing prompt variable metadata; can be repeated",
     )
+    parser.add_argument("--list-templates", action="store_true", help="List starter prompt templates and exit")
+    parser.add_argument("--show-template", help="Show full details for one starter prompt template and exit")
+    parser.add_argument("--template", help="Use a starter prompt template by id")
+    parser.add_argument("--template-category", default=DEFAULT_TEMPLATE_CATEGORY, help="Filter --list-templates by category")
+    parser.add_argument("--template-search", help="Search template ids, titles, descriptions, variables, and prompt text")
+    parser.add_argument(
+        "--template-format",
+        choices=TEMPLATE_LIST_FORMATS,
+        default="text",
+        help="Output format for --list-templates or --show-template",
+    )
+    parser.add_argument(
+        "--template-var",
+        action="append",
+        default=[],
+        metavar="NAME=VALUE",
+        help="Template placeholder value; can be repeated with --template or --show-template",
+    )
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
+
+    if args.list_templates and args.show_template:
+        parser.error("Use either --list-templates or --show-template, not both.")
+
+    if args.list_templates:
+        if args.template_var:
+            parser.error("--template-var can only be used with --template or --show-template")
+        _print_templates(args.template_category, args.template_search, args.template_format, parser)
+        return 0
+
+    if args.show_template:
+        _print_template_detail(args.show_template, args.template_var, args.template_format, parser)
+        return 0
+
     root = Path(args.path).resolve()
     if not root.exists():
         parser.error(f"Project path does not exist: {root}")
@@ -91,6 +126,20 @@ def main(argv: list[str] | None = None) -> int:
             parser.error(f"Error log must be a file: {error_path}")
         error_log = error_path.read_text(encoding="utf-8", errors="replace")
 
+    template = None
+    goal = args.goal
+    if args.template:
+        try:
+            template = get_template(args.template)
+        except KeyError as exc:
+            parser.error(str(exc))
+        template_values = _parse_template_vars(args.template_var, parser)
+        _validate_template_values(template, template_values, parser)
+        template_goal = render_template_goal(template, template_values)
+        goal = f"{args.goal}\n\n{template_goal}" if args.goal else template_goal
+    elif args.template_var:
+        parser.error("--template-var can only be used with --template or --show-template")
+
     exclude_patterns = _exclude_generated_output(args.exclude, root, output_path)
     scan = scan_project(
         root,
@@ -100,11 +149,12 @@ def main(argv: list[str] | None = None) -> int:
     )
     output = render_context_pack(
         scan,
-        goal=args.goal,
+        goal=goal,
         mode=args.mode,
         error_log=error_log,
         required_variables=required_variables,
         prompt_variables=prompt_variables,
+        template=template,
     )
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(output, encoding="utf-8")
@@ -115,7 +165,155 @@ def main(argv: list[str] | None = None) -> int:
     print(f"Created: {output_path}")
     print(f"Tokens estimate: {estimate_tokens(output):,}")
     print(f"Files included: {len(scan.files)}")
+    if template:
+        print(f"Template: {template.id}")
     return 0
+
+
+def _print_templates(category: str, query: str | None, output_format: str, parser: argparse.ArgumentParser) -> None:
+    normalized_category = _normalize_template_category(category, parser)
+    templates = list_templates(category=normalized_category, query=query)
+    if output_format == "json":
+        _print_templates_json(templates, normalized_category, query)
+        return
+    if not templates:
+        print("No templates found.")
+        return
+
+    print("Available template categories: " + ", ".join(_available_template_categories()))
+    current_category = None
+    for template in templates:
+        if template.category != current_category:
+            current_category = template.category
+            print(f"\n[{current_category}]")
+        variables = ", ".join(template.variables) if template.variables else "none"
+        print(f"- {template.id}: {template.title}")
+        print(f"  {template.description}")
+        print(f"  variables: {variables}")
+
+
+def _print_template_detail(
+    template_id: str,
+    raw_values: list[str],
+    output_format: str,
+    parser: argparse.ArgumentParser,
+) -> None:
+    try:
+        template = get_template(template_id)
+    except KeyError as exc:
+        parser.error(str(exc))
+
+    values = _parse_template_vars(raw_values, parser)
+    _validate_template_values(template, values, parser)
+    rendered_goal = render_template_goal(template, values)
+    missing = _missing_template_variables(template, values)
+
+    if output_format == "json":
+        payload = _template_to_detail_dict(template, values, rendered_goal, missing)
+        print(json.dumps(payload, indent=2, sort_keys=True))
+        return
+
+    variables = ", ".join(template.variables) if template.variables else "none"
+    print(f"Template: {template.id}")
+    print(f"Title: {template.title}")
+    print(f"Category: {template.category}")
+    print(f"Description: {template.description}")
+    print(f"Variables: {variables}")
+    print(f"Example output: {template.example_output}")
+    print("\nPrompt:")
+    print(template.prompt)
+    print("\nRendered goal preview:")
+    print(rendered_goal)
+    if missing:
+        print("\nMissing variables: " + ", ".join(missing))
+
+
+def _print_templates_json(templates: list[PromptTemplate], category: str | None, query: str | None) -> None:
+    payload = {
+        "schema_version": 1,
+        "filters": {"category": category or DEFAULT_TEMPLATE_CATEGORY, "query": query or ""},
+        "available_categories": _available_template_categories(),
+        "count": len(templates),
+        "templates": [_template_to_dict(template) for template in templates],
+    }
+    print(json.dumps(payload, indent=2, sort_keys=True))
+
+
+def _template_to_dict(template: PromptTemplate) -> dict[str, object]:
+    return {
+        "id": template.id,
+        "category": template.category,
+        "title": template.title,
+        "description": template.description,
+        "variables": list(template.variables),
+        "example_output": template.example_output,
+    }
+
+
+def _template_to_detail_dict(
+    template: PromptTemplate,
+    values: dict[str, str],
+    rendered_goal: str,
+    missing: list[str],
+) -> dict[str, object]:
+    payload = _template_to_dict(template)
+    payload.update({
+        "schema_version": 1,
+        "prompt": template.prompt,
+        "provided_variables": values,
+        "missing_variables": missing,
+        "rendered_goal": rendered_goal,
+    })
+    return payload
+
+
+def _normalize_template_category(category: str, parser: argparse.ArgumentParser) -> str | None:
+    normalized = category.casefold().strip()
+    if normalized == DEFAULT_TEMPLATE_CATEGORY:
+        return None
+
+    categories = list_categories()
+    if normalized not in categories:
+        parser.error(
+            "Unknown template category "
+            f"'{category}'. Available categories: {', '.join(_available_template_categories())}"
+        )
+    return normalized
+
+
+def _available_template_categories() -> list[str]:
+    return [DEFAULT_TEMPLATE_CATEGORY, *list_categories()]
+
+
+def _parse_template_vars(raw_values: list[str], parser: argparse.ArgumentParser) -> dict[str, str]:
+    values: dict[str, str] = {}
+    for raw_value in raw_values:
+        if "=" not in raw_value:
+            parser.error(f"Template variable must use KEY=VALUE format: {raw_value}")
+        key, value = raw_value.split("=", 1)
+        try:
+            key = canonical_prompt_variable_name(key.strip())
+        except ValueError as exc:
+            parser.error(str(exc))
+        if key in values:
+            parser.error(f"Duplicate template variable '{key}'. Provide each --template-var key once.")
+        values[key] = value
+    return values
+
+
+def _validate_template_values(template: PromptTemplate, values: dict[str, str], parser: argparse.ArgumentParser) -> None:
+    allowed = set(template.variables)
+    unknown = sorted(set(values) - allowed)
+    if unknown:
+        expected = ", ".join(template.variables) if template.variables else "none"
+        parser.error(
+            f"Unknown variable for template '{template.id}': {', '.join(unknown)}. "
+            f"Expected variables: {expected}"
+        )
+
+
+def _missing_template_variables(template: PromptTemplate, values: dict[str, str]) -> list[str]:
+    return [variable for variable in template.variables if variable not in values]
 
 
 def _load_prompt_variable_files(paths: list[str] | None) -> dict[str, str]:
