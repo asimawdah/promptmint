@@ -1,3 +1,5 @@
+import contextlib
+import io
 import json
 import tempfile
 import unittest
@@ -90,6 +92,165 @@ class CliTest(unittest.TestCase):
             self.assertIn("Provided variables: `area, ticket`", text)
             self.assertIn("- `ticket`:\n```text\nPM-123\n```", text)
             self.assertIn("- `area`:\n```text\nlogin\n```", text)
+
+    def test_cli_lists_templates_with_category_filter_and_search(self):
+        stdout = io.StringIO()
+
+        with contextlib.redirect_stdout(stdout):
+            exit_code = main(["--list-templates", "--template-category", "debugging", "--template-search", "traceback"])
+
+        self.assertEqual(exit_code, 0)
+        output = stdout.getvalue()
+        self.assertIn("Available template categories: all, coding, debugging, learning, product-planning, writing", output)
+        self.assertIn("[debugging]", output)
+        self.assertIn("debug-traceback", output)
+        self.assertNotIn("[coding]", output)
+
+    def test_cli_lists_templates_as_stable_json(self):
+        stdout = io.StringIO()
+
+        with contextlib.redirect_stdout(stdout):
+            exit_code = main([
+                "--list-templates",
+                "--template-category", "debugging",
+                "--template-search", "traceback",
+                "--template-format", "json",
+            ])
+
+        self.assertEqual(exit_code, 0)
+        payload = json.loads(stdout.getvalue())
+        self.assertEqual(payload["schema_version"], 1)
+        self.assertEqual(payload["filters"], {"category": "debugging", "query": "traceback"})
+        self.assertIn("all", payload["available_categories"])
+        self.assertEqual(payload["count"], 1)
+        self.assertEqual(payload["templates"][0]["id"], "debug-traceback")
+        self.assertNotIn("prompt", payload["templates"][0])
+
+    def test_cli_shows_single_template_detail_as_text(self):
+        stdout = io.StringIO()
+
+        with contextlib.redirect_stdout(stdout):
+            exit_code = main([
+                "--show-template", "bug-root-cause",
+                "--template-var", "bug=login redirects",
+            ])
+
+        self.assertEqual(exit_code, 0)
+        output = stdout.getvalue()
+        self.assertIn("Template: bug-root-cause", output)
+        self.assertIn("Prompt:", output)
+        self.assertIn("Analyze the included code", output)
+        self.assertIn("login redirects", output)
+        self.assertIn("Missing variables: expected_behavior", output)
+
+    def test_cli_shows_single_template_detail_as_json(self):
+        stdout = io.StringIO()
+
+        with contextlib.redirect_stdout(stdout):
+            exit_code = main([
+                "--show-template", "bug-root-cause",
+                "--template-format", "json",
+                "--template-var", "bug=login redirects",
+                "--template-var", "expected_behavior=user reaches dashboard",
+            ])
+
+        self.assertEqual(exit_code, 0)
+        payload = json.loads(stdout.getvalue())
+        self.assertEqual(payload["schema_version"], 1)
+        self.assertEqual(payload["id"], "bug-root-cause")
+        self.assertIn("prompt", payload)
+        self.assertEqual(payload["provided_variables"]["bug"], "login redirects")
+        self.assertEqual(payload["missing_variables"], [])
+        self.assertIn("user reaches dashboard", payload["rendered_goal"])
+
+    def test_cli_applies_template_and_metadata_variables_to_output(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            output = root / "template.md"
+            (root / "app.py").write_text("print('hello')\n", encoding="utf-8")
+
+            exit_code = main([
+                str(root),
+                "--template", "bug-root-cause",
+                "--template-var", "bug=login issue",
+                "--template-var", "expected_behavior=user reaches dashboard",
+                "--require", "ticket",
+                "--var", "ticket=PM-123",
+                "--output", str(output),
+            ])
+
+            self.assertEqual(exit_code, 0)
+            text = output.read_text(encoding="utf-8")
+            self.assertIn("## Prompt Template", text)
+            self.assertIn("bug-root-cause", text)
+            self.assertIn("login issue", text)
+            self.assertIn("user reaches dashboard", text)
+            self.assertIn("Provided variables: `ticket`", text)
+
+    def test_cli_rejects_template_var_without_template(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "app.py").write_text("print('hello')\n", encoding="utf-8")
+
+            with self.assertRaises(SystemExit) as context:
+                main([str(root), "--template-var", "topic=login"])
+
+            self.assertNotEqual(context.exception.code, 0)
+
+    def test_cli_rejects_list_and_show_templates_together(self):
+        stderr = io.StringIO()
+
+        with contextlib.redirect_stderr(stderr):
+            with self.assertRaises(SystemExit) as context:
+                main(["--list-templates", "--show-template", "bug-root-cause"])
+
+        self.assertNotEqual(context.exception.code, 0)
+        self.assertIn("Use either --list-templates or --show-template", stderr.getvalue())
+
+    def test_cli_rejects_unknown_template_category(self):
+        stderr = io.StringIO()
+
+        with contextlib.redirect_stderr(stderr):
+            with self.assertRaises(SystemExit) as context:
+                main(["--list-templates", "--template-category", "debuggng"])
+
+        self.assertNotEqual(context.exception.code, 0)
+        error = stderr.getvalue()
+        self.assertIn("Unknown template category 'debuggng'", error)
+        self.assertIn("Available categories: all, coding, debugging, learning, product-planning, writing", error)
+
+    def test_cli_rejects_unknown_template_variable(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "app.py").write_text("print('hello')\n", encoding="utf-8")
+            stderr = io.StringIO()
+
+            with contextlib.redirect_stderr(stderr):
+                with self.assertRaises(SystemExit) as context:
+                    main([str(root), "--template", "bug-root-cause", "--template-var", "unexpected=value"])
+
+            self.assertNotEqual(context.exception.code, 0)
+            error = stderr.getvalue()
+            self.assertIn("Unknown variable for template 'bug-root-cause': unexpected", error)
+            self.assertIn("Expected variables: bug, expected_behavior", error)
+
+    def test_cli_rejects_duplicate_template_variable(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "app.py").write_text("print('hello')\n", encoding="utf-8")
+            stderr = io.StringIO()
+
+            with contextlib.redirect_stderr(stderr):
+                with self.assertRaises(SystemExit) as context:
+                    main([
+                        str(root),
+                        "--template", "bug-root-cause",
+                        "--template-var", "bug=first",
+                        "--template-var", "bug=second",
+                    ])
+
+            self.assertNotEqual(context.exception.code, 0)
+            self.assertIn("Duplicate template variable 'bug'", stderr.getvalue())
 
     def test_cli_rejects_duplicate_prompt_variables_across_file_and_inline_values(self):
         with tempfile.TemporaryDirectory() as tmp:
