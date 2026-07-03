@@ -25,6 +25,54 @@ class RenderContextPackTest(unittest.TestCase):
         self.assertIn("diff --git", output)
         self.assertIn("Traceback here", output)
 
+    def test_render_context_pack_contains_structured_metadata(self):
+        scan = ScanResult(
+            root="/project",
+            tree="app.py",
+            files=[ProjectFile(relative_path="app.py", language="python", content="print('hello')\n")],
+            dependency_files=[],
+            git_diff="",
+        )
+
+        output = render_context_pack(
+            scan,
+            goal="Review task",
+            mode="review",
+            required_variables=("ticket",),
+            prompt_variables={"ticket": "APP-42"},
+        )
+
+        self.assertIn("## Prompt Metadata", output)
+        self.assertIn("- Schema version: `1`", output)
+        self.assertIn("- Mode: `review`", output)
+        self.assertIn("- Goal provided: `true`", output)
+        self.assertIn("- Files included: `1`", output)
+        self.assertIn("- Variable validation: `complete`", output)
+        self.assertIn("- Required variable count: `1`", output)
+        self.assertIn("- Provided variable count: `1`", output)
+        self.assertIn("- Required variables: `ticket`", output)
+        self.assertIn("## Prompt Variables", output)
+        self.assertIn("- `ticket`:\n```text\nAPP-42\n```", output)
+
+    def test_render_context_pack_fences_prompt_variables_safely(self):
+        scan = ScanResult(
+            root="/project",
+            tree="app.py",
+            files=[ProjectFile(relative_path="app.py", language="python", content="print('hello')\n")],
+            dependency_files=[],
+            git_diff="",
+        )
+
+        output = render_context_pack(
+            scan,
+            goal="Review task",
+            mode="review",
+            prompt_variables={"notes": "line one\n```\nline two"},
+        )
+
+        self.assertIn("- `notes`:", output)
+        self.assertIn("````text\nline one\n```\nline two\n````", output)
+
 
 if __name__ == "__main__":
     unittest.main()

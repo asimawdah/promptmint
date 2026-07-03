@@ -40,6 +40,39 @@ promptmint --goal "Explain this project" --mode explain
 promptmint -e error.log -m debug -c
 ```
 
+Add structured metadata and required prompt variables when the output must be traceable to a ticket, feature area, or review scope:
+
+```bash
+promptmint . \
+  --goal "Review the login flow" \
+  --mode review \
+  --require ticket \
+  --var ticket=PM-123 \
+  --var area=login \
+  --output reports/PM-123-review.md
+```
+
+For repeatable scripts, store non-sensitive prompt metadata in a JSON object and load it with `--vars-file`:
+
+```json
+{
+  "ticket": "PM-123",
+  "area": "login",
+  "reviewer": "asim"
+}
+```
+
+```bash
+promptmint . \
+  --goal "Review the login flow" \
+  --mode review \
+  --require ticket,area \
+  --vars-file prompt-vars.json \
+  --output reports/PM-123-review.md
+```
+
+If a required variable is missing or empty, PromptMint exits before writing an incomplete context pack. Duplicate variable names are also rejected so metadata cannot be overwritten accidentally. Variable names are canonicalized to lowercase, so case variants like `Ticket` and `ticket` are treated as the same workflow field. Secret-like metadata names such as password, token, private-key, credential, or api-key are rejected because `--var` and `--vars-file` are for workflow context, not sensitive values.
+
 ## CLI Shortcuts
 
 - `-g`, `--goal`: task goal
@@ -47,9 +80,12 @@ promptmint -e error.log -m debug -c
 - `-e`, `--error`: error log file
 - `-i`, `--include`: include glob, repeatable
 - `-x`, `--exclude`: exclude glob, repeatable
-- `-o`, `--output`: output Markdown file
-- `-c`, `--copy`: copy output to clipboard
+- `-o`, `--output`: output Markdown file; must end in `.md` or `.markdown`; missing parent directories are created; existing output files inside the scanned project are excluded from the scan
+- `-c`, `--copy`: copy output to clipboard if a clipboard tool is available
 - `-s`, `--max-file-bytes`: skip files larger than this size
+- `--require`: required prompt variable name; can be repeated; comma-separated shorthand is supported; names are canonicalized to lowercase and cannot look like secrets
+- `--var`: prompt variable metadata in `NAME=VALUE` format; can be repeated, but each canonicalized name must be unique and non-sensitive
+- `--vars-file`: JSON object containing prompt variable metadata; can be repeated; keys follow the same name rules as `--var`, values must be strings, and duplicate canonical names are rejected across files and inline variables
 
 ## Modes
 
@@ -58,6 +94,32 @@ promptmint -e error.log -m debug -c
 - `explain`: explain how the project works
 - `refactor`: safe refactor plan
 
+## Prompt metadata
+
+Every generated context pack now includes a `Prompt Metadata` section with:
+
+- schema version for future-compatible metadata changes
+- selected mode
+- whether a goal was provided
+- included file and dependency counts
+- whether git diff or error logs are present
+- variable validation status and variable counts
+- required and provided variable names when supplied
+
+Use metadata for repeatable workflows where the generated prompt should stay connected to an issue, PR, feature area, reviewer, or environment.
+
+Recommended variable names:
+
+- `ticket` for an issue or task id
+- `pr` for a pull request id
+- `area` for the affected feature or module
+- `env` for the runtime environment
+- `owner` for the person or team responsible for follow-up
+
+Avoid using `--var` or `--vars-file` for secrets, tokens, credentials, private keys, or passwords. PromptMint rejects variable names that look sensitive, but generated context packs should still be reviewed before sharing.
+
+See [Prompt Metadata and Validation](docs/PROMPT_METADATA.md) for details about schema fields, canonical variable names, required-variable validation, secret-like name rejection, safe Markdown rendering, JSON variable files, and output path rules.
+
 ## What it includes
 
 - Project tree
@@ -65,6 +127,7 @@ promptmint -e error.log -m debug -c
 - Git diff, if available
 - Text source files
 - Optional error log
+- Prompt metadata and variables
 - Final instruction tailored to the selected mode
 
 ## What it ignores by default
@@ -73,6 +136,7 @@ promptmint -e error.log -m debug -c
 - `.env` files
 - Binary files
 - Large files over 50KB by default
+- The generated `--output` file when it already exists inside the scanned project
 
 ## Safety notes
 
@@ -83,7 +147,9 @@ Recommended safe workflow:
 1. Run PromptMint with a narrow include pattern first.
 2. Open the generated Markdown and check for secrets, tokens, private URLs, or customer data.
 3. Add extra `--exclude` patterns for anything that should never leave your machine.
-4. Commit a project-level `.gitignore` and keep secrets in ignored `.env` files.
+4. Write the pack to an explicit Markdown path such as `reports/BUG-18-debug.md`.
+5. Re-run to the same output path safely when needed; PromptMint excludes that generated file from the scan.
+6. Commit a project-level `.gitignore` and keep secrets in ignored `.env` files.
 
 Example:
 
@@ -92,17 +158,26 @@ promptmint . \
   --include "src/**/*.py" \
   --exclude "**/secrets/**" \
   --exclude "**/*.pem" \
-  --goal "Review this module safely"
+  --goal "Review this module safely" \
+  --output reports/module-review.md
 ```
 
 ## Examples
 
 ```bash
-promptmint . --include "src/**/*.py" --goal "Find the bug"
+promptmint . --include "src/**/*.py" --goal "Find the bug" --output reports/bug-context.md
 ```
 
 ```bash
-promptmint . --exclude "tests/fixtures/**" --max-file-bytes 20000
+promptmint . --exclude "tests/fixtures/**" --max-file-bytes 20000 --output reports/trimmed-context.markdown
+```
+
+```bash
+promptmint . --mode debug --require ticket --var ticket=BUG-18 --var area=scanner --output reports/BUG-18-debug.md
+```
+
+```bash
+promptmint . --mode review --require ticket,area --vars-file prompt-vars.json --output reports/review-context.md
 ```
 
 See [Prompt Output Examples](docs/prompt-output-examples.md) for sample Markdown packs generated by debug, review, explain, and refactor modes.
@@ -120,6 +195,10 @@ python3 -m unittest discover -s tests -v
 - [x] Dependency manifest detection
 - [x] Git diff inclusion
 - [x] Debug/review/explain/refactor modes
+- [x] Prompt metadata and required variable validation
+- [x] Canonical prompt variable names
+- [x] Secret-like prompt metadata name rejection
+- [x] JSON prompt variable files
 - [ ] Better `.gitignore` support
 - [ ] Token budget smart trimming
 - [ ] Interactive file picker

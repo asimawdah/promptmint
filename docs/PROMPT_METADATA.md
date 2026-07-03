@@ -1,0 +1,252 @@
+# Prompt Metadata and Validation
+
+PromptMint context packs are easier to review and reuse when the generated Markdown includes a small amount of structured metadata. This is especially useful for issue-driven debugging, PR review, and AI-agent handoff workflows.
+
+## Metadata section
+
+Generated packs include a `Prompt Metadata` section with:
+
+- metadata schema version
+- selected mode
+- whether a goal was provided
+- number of files included
+- number of dependency files included
+- whether git diff is present
+- whether an error log is present
+- variable validation status
+- required and provided variable counts
+- required variable names
+- provided variable names
+
+This makes the output easier to audit before it is pasted into an AI tool.
+
+Example:
+
+```markdown
+## Prompt Metadata
+
+- Schema version: `1`
+- Mode: `review`
+- Goal provided: `true`
+- Files included: `12`
+- Dependency files included: `2`
+- Includes git diff: `true`
+- Includes error log: `false`
+- Variable validation: `complete`
+- Required variable count: `2`
+- Provided variable count: `3`
+- Required variables: `ticket, area`
+- Provided variables: `area, owner, ticket`
+```
+
+`Variable validation` is `complete` when every required variable name is present in the generated metadata. It is `incomplete` only when metadata is constructed programmatically with missing required names; the CLI exits before writing output in that case.
+
+## Required variables
+
+Use `--require` when a context pack must include specific workflow fields.
+
+```bash
+promptmint . \
+  --mode review \
+  --goal "Review the login changes" \
+  --require ticket \
+  --require area \
+  --var ticket=PM-123 \
+  --var area=login
+```
+
+You can also use comma-separated shorthand for compact scripts:
+
+```bash
+promptmint . \
+  --mode review \
+  --goal "Review the login changes" \
+  --require ticket,area \
+  --var ticket=PM-123 \
+  --var area=login
+```
+
+If `ticket` or `area` is missing or empty, PromptMint exits with a clear CLI error before writing an incomplete pack.
+
+## Variable format
+
+Variables use `NAME=VALUE` format:
+
+```bash
+--var ticket=BUG-18 --var area=scanner --var env=local
+```
+
+Variable names must start with a letter or number. After the first character, names may contain:
+
+- letters
+- numbers
+- underscores
+- dashes
+
+PromptMint canonicalizes variable names by trimming surrounding whitespace and lowercasing names before validation output is rendered. This keeps metadata stable across scripts and prevents case variants such as `Ticket` and `ticket` from behaving like different fields.
+
+This rejects ambiguous option-like names such as `-flag` or `-`, while still allowing stable workflow names such as `ticket-id` and `area_name`.
+
+Sensitive-looking names are rejected for both `--require` and `--var`. Prompt metadata is intended for workflow context, not confidential material. Use labels such as `ticket`, `pr`, `area`, `env`, `owner`, or `reviewer` instead.
+
+Examples:
+
+- `ticket=BUG-18`
+- `ticket-id=BUG-18`
+- `area=onboarding`
+- `reviewer=asim`
+- `env=staging`
+
+Canonical examples:
+
+| Input | Stored metadata name |
+| --- | --- |
+| `Ticket=BUG-18` | `ticket` |
+| ` AREA_NAME = cli` | `area_name` |
+| `ticket-id=BUG-18` | `ticket-id` |
+
+## JSON variable files
+
+Use `--vars-file` when a script or support workflow already has prompt metadata in a reusable JSON file.
+
+`prompt-vars.json`:
+
+```json
+{
+  "ticket": "PM-123",
+  "area": "login",
+  "reviewer": "asim"
+}
+```
+
+```bash
+promptmint . \
+  --mode review \
+  --goal "Review the login changes" \
+  --require ticket,area \
+  --vars-file prompt-vars.json \
+  --output reports/PM-123-review.md
+```
+
+Rules:
+
+- each variable file must contain a JSON object
+- object keys follow the same canonical name and sensitive-name rules as `--var`
+- values must be strings
+- values are trimmed before validation and rendering
+- `--vars-file` can be repeated
+- duplicate canonical names are rejected across all files and inline `--var` values
+
+This keeps scripted metadata repeatable without allowing one source to silently overwrite another.
+
+Invalid examples:
+
+```json
+["ticket", "PM-123"]
+```
+
+```json
+{
+  "ticket": 123
+}
+```
+
+## Output path validation
+
+PromptMint writes Markdown context packs, so `--output` is validated before scanning and rendering start:
+
+- output files must end in `.md` or `.markdown`
+- an existing directory cannot be used as the output target
+- an existing file cannot be used as the parent directory
+- missing parent directories are created automatically
+- an existing output file inside the scanned project is excluded from the scan automatically
+
+Valid examples:
+
+```bash
+promptmint . --output review-context.md
+promptmint . --output reports/auth-review/context.markdown
+```
+
+Invalid examples:
+
+```bash
+promptmint . --output context.txt
+promptmint . --output reports/
+```
+
+These checks prevent accidental writes to ambiguous paths and make scripted prompt generation safer.
+
+When you repeatedly generate a pack to a path inside the project, PromptMint excludes that exact output file from the scan. This prevents stale generated Markdown from being copied into the next context pack and keeps file counts, project trees, and rendered context cleaner.
+
+## Markdown-safe output
+
+Prompt variable values are rendered as fenced `text` blocks in the generated Markdown instead of inline raw text. This keeps the context pack readable and prevents multiline values or values containing backticks from breaking the surrounding Markdown.
+
+Example output:
+
+````markdown
+## Prompt Variables
+
+- `ticket`:
+```text
+BUG-18
+```
+
+- `notes`:
+`````text
+Line one
+```
+Line two
+`````
+````
+
+PromptMint automatically chooses a longer fence when the value already contains triple backticks.
+
+## Recommended workflow
+
+1. Decide which metadata fields are required for the task.
+2. Pass those names through `--require` or `--require ticket,area`.
+3. Pass values through `--var NAME=VALUE` or `--vars-file prompt-vars.json`.
+4. Keep metadata variable names lowercase in scripts and examples for readability, even though PromptMint canonicalizes them before rendering.
+5. Use only non-sensitive workflow fields in prompt variables; do not pass confidential material through metadata.
+6. Choose an explicit Markdown output path when the pack is part of a repeatable review or support workflow.
+7. Review the generated `Prompt Metadata` and `Prompt Variables` sections before sharing the pack.
+8. Check that `Variable validation` is `complete` and the required/provided counts match the expected workflow fields.
+9. Reuse the same output path safely; PromptMint excludes the existing generated file from subsequent scans.
+
+## Safe examples
+
+Debug a linked issue:
+
+```bash
+promptmint . \
+  --mode debug \
+  --goal "Find the root cause of the scanner failure" \
+  --require ticket \
+  --var ticket=BUG-18 \
+  --var area=scanner \
+  --output reports/BUG-18-debug.md
+```
+
+Review a pull request:
+
+```bash
+promptmint . \
+  --mode review \
+  --goal "Review this PR for correctness and security" \
+  --require pr,area \
+  --var pr=42 \
+  --var area=auth \
+  --output reports/pr-42-review.md
+```
+
+Create an explanation pack from a variables file:
+
+```bash
+promptmint . \
+  --mode explain \
+  --goal "Explain the CLI architecture" \
+  --vars-file prompt-vars.json \
+  --output reports/cli-explain.markdown
+```

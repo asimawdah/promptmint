@@ -1,14 +1,24 @@
 from __future__ import annotations
 
 import argparse
+import json
 import shutil
 import subprocess
 import sys
+from json import JSONDecodeError
 from pathlib import Path
 
+from .metadata import (
+    canonical_prompt_variable_name,
+    missing_required_variables,
+    normalize_required_variables,
+    parse_variable_assignments,
+)
 from .renderer import MODE_REQUESTS, render_context_pack
 from .scanner import scan_project
 from .tokens import estimate_tokens
+
+ALLOWED_OUTPUT_SUFFIXES = {".md", ".markdown"}
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -25,6 +35,27 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("-o", "--output", default="promptmint-output.md", help="Output Markdown file")
     parser.add_argument("-c", "--copy", action="store_true", help="Copy output to clipboard if a clipboard tool is available")
     parser.add_argument("-s", "--max-file-bytes", type=_positive_int, default=50_000, help="Skip files larger than this size")
+    parser.add_argument(
+        "--require",
+        action="append",
+        default=[],
+        metavar="NAME",
+        help="Required prompt variable name; can be repeated and must be supplied with --var",
+    )
+    parser.add_argument(
+        "--var",
+        action="append",
+        default=[],
+        metavar="NAME=VALUE",
+        help="Prompt variable metadata to include in the generated pack; can be repeated",
+    )
+    parser.add_argument(
+        "--vars-file",
+        action="append",
+        default=[],
+        metavar="PATH",
+        help="JSON object containing prompt variable metadata; can be repeated",
+    )
     return parser
 
 
@@ -37,6 +68,20 @@ def main(argv: list[str] | None = None) -> int:
     if not root.is_dir():
         parser.error(f"Project path must be a directory: {root}")
 
+    try:
+        required_variables = normalize_required_variables(args.require)
+        prompt_variables = _merge_prompt_variables(
+            _load_prompt_variable_files(args.vars_file),
+            parse_variable_assignments(args.var),
+        )
+        output_path = _resolve_output_path(args.output)
+    except ValueError as exc:
+        parser.error(str(exc))
+
+    missing_variables = missing_required_variables(required_variables, prompt_variables)
+    if missing_variables:
+        parser.error("Missing required prompt variables: " + ", ".join(missing_variables))
+
     error_log = None
     if args.error_file:
         error_path = Path(args.error_file).resolve()
@@ -46,14 +91,22 @@ def main(argv: list[str] | None = None) -> int:
             parser.error(f"Error log must be a file: {error_path}")
         error_log = error_path.read_text(encoding="utf-8", errors="replace")
 
+    exclude_patterns = _exclude_generated_output(args.exclude, root, output_path)
     scan = scan_project(
         root,
         include=args.include,
-        exclude=args.exclude,
+        exclude=exclude_patterns,
         max_file_bytes=args.max_file_bytes,
     )
-    output = render_context_pack(scan, goal=args.goal, mode=args.mode, error_log=error_log)
-    output_path = Path(args.output).resolve()
+    output = render_context_pack(
+        scan,
+        goal=args.goal,
+        mode=args.mode,
+        error_log=error_log,
+        required_variables=required_variables,
+        prompt_variables=prompt_variables,
+    )
+    output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(output, encoding="utf-8")
 
     if args.copy:
@@ -63,6 +116,68 @@ def main(argv: list[str] | None = None) -> int:
     print(f"Tokens estimate: {estimate_tokens(output):,}")
     print(f"Files included: {len(scan.files)}")
     return 0
+
+
+def _load_prompt_variable_files(paths: list[str] | None) -> dict[str, str]:
+    variables: dict[str, str] = {}
+    for value in paths or []:
+        path = Path(value).expanduser().resolve()
+        if not path.exists():
+            raise ValueError(f"Prompt variables file does not exist: {path}")
+        if not path.is_file():
+            raise ValueError(f"Prompt variables file must be a file: {path}")
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except JSONDecodeError as exc:
+            raise ValueError(f"Prompt variables file must contain valid JSON: {path}: {exc.msg}") from exc
+        if not isinstance(data, dict):
+            raise ValueError(f"Prompt variables file must contain a JSON object: {path}")
+        variables = _merge_prompt_variables(variables, _parse_prompt_variable_file_data(data, path))
+    return variables
+
+
+def _parse_prompt_variable_file_data(data: dict[str, object], path: Path) -> dict[str, str]:
+    variables: dict[str, str] = {}
+    for raw_name, raw_value in data.items():
+        name = canonical_prompt_variable_name(raw_name)
+        if not isinstance(raw_value, str):
+            raise ValueError(f"Prompt variable '{name}' in {path} must be a string")
+        variables = _merge_prompt_variables(variables, {name: raw_value.strip()})
+    return variables
+
+
+def _merge_prompt_variables(base: dict[str, str], incoming: dict[str, str]) -> dict[str, str]:
+    duplicates = sorted(set(base).intersection(incoming))
+    if duplicates:
+        raise ValueError("duplicate prompt variable: " + ", ".join(duplicates))
+    merged = dict(base)
+    merged.update(incoming)
+    return merged
+
+
+def _resolve_output_path(value: str) -> Path:
+    output_path = Path(value).expanduser().resolve()
+    if output_path.exists() and output_path.is_dir():
+        raise ValueError(f"Output path must be a Markdown file, not a directory: {output_path}")
+    if output_path.suffix.lower() not in ALLOWED_OUTPUT_SUFFIXES:
+        allowed = ", ".join(sorted(ALLOWED_OUTPUT_SUFFIXES))
+        raise ValueError(f"Output file must use a Markdown extension ({allowed}): {output_path}")
+    if output_path.parent.exists() and not output_path.parent.is_dir():
+        raise ValueError(f"Output parent path must be a directory: {output_path.parent}")
+    return output_path
+
+
+def _exclude_generated_output(exclude_patterns: list[str], root: Path, output_path: Path) -> list[str]:
+    """Return user exclusions plus the output file when it lives inside the scan root."""
+
+    patterns = list(exclude_patterns)
+    try:
+        output_rel = output_path.relative_to(root).as_posix()
+    except ValueError:
+        return patterns
+    if output_rel and output_rel not in patterns:
+        patterns.append(output_rel)
+    return patterns
 
 
 def _positive_int(value: str) -> int:
