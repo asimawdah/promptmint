@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from .metadata import PromptMetadata
 from .models import ProjectFile, ScanResult
+from .templates import PromptTemplate
 
 MODE_REQUESTS = {
     "debug": "Please find the root cause, explain it briefly, and suggest the smallest safe fix.",
@@ -18,11 +19,23 @@ def render_context_pack(
     error_log: str | None = None,
     required_variables: tuple[str, ...] = (),
     prompt_variables: dict[str, str] | None = None,
+    template: PromptTemplate | None = None,
 ) -> str:
     mode = mode if mode in MODE_REQUESTS else "debug"
     prompt_variables = prompt_variables or {}
     sections = ["# Project Context Pack", ""]
     sections.extend(["## Goal", goal or "Analyze this project context and help with the task.", ""])
+    if template:
+        sections.extend([
+            "## Prompt Template",
+            f"- ID: `{template.id}`",
+            f"- Category: `{template.category}`",
+            f"- Title: {template.title}",
+            f"- Description: {template.description}",
+            f"- Variables: {', '.join(template.variables) if template.variables else 'none'}",
+            f"- Example output: {template.example_output}",
+            "",
+        ])
     sections.extend([f"## {mode.title()} Request", MODE_REQUESTS[mode], ""])
     sections.extend(
         PromptMetadata(
